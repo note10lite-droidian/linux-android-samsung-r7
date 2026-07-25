@@ -3,10 +3,14 @@
 #
 
 obj-$(CONFIG_BT)	+= bluetooth.o
-#obj-$(CONFIG_BT_RFCOMM)	+= rfcomm/
-#obj-$(CONFIG_BT_BNEP)	+= bnep/
+# Samsung bu uc satiri yorumlamisti; CONFIG_BT_{RFCOMM,BNEP,HIDP}=y olsa bile
+# alt-dizine inilmedigi icin derlenmiyorlardi (hci_sock.c'deki yorumlama ile ayni
+# sinif). BNEP olmadan BT tethering, RFCOMM olmadan seri profiller, HIDP olmadan
+# BT klavye/fare calismaz. Geri acildi.
+obj-$(CONFIG_BT_RFCOMM)	+= rfcomm/
+obj-$(CONFIG_BT_BNEP)	+= bnep/
 obj-$(CONFIG_BT_CMTP)	+= cmtp/
-#obj-$(CONFIG_BT_HIDP)	+= hidp/
+obj-$(CONFIG_BT_HIDP)	+= hidp/
 obj-$(CONFIG_BT_6LOWPAN) += bluetooth_6lowpan.o
 
 bluetooth_6lowpan-y := 6lowpan.o
