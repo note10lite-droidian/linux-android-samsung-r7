@@ -1,5 +1,11 @@
 ccflags-y += $(USER_EXTRA_CFLAGS)
 ccflags-y += -O1
+# clang-9 (AOSP r353983c) bazi GCC -Wno-* bayraklarini tanimiyor
+# (-Wno-int-in-bool-context, -Wno-misleading-indentation, -Wno-stringop-overread);
+# -Werror,-Wunknown-warning-option ile olumcul hataya donusuyorlardi. Bu bayrak
+# clang'in bilinmeyen -Wno-*'lari sessizce gecmesini saglar (ana kernelde
+# -Wno-unused-but-set-variable kaldirmamizla ayni sinif toolchain-nesil sorunu).
+ccflags-y += -Wno-unknown-warning-option
 #ccflags-y += -O3
 #ccflags-y += -Wall
 #ccflags-y += -Wextra
