@@ -3968,6 +3968,52 @@ static ssize_t displayport_dp_test_store(struct class *dev,
 }
 static CLASS_ATTR(dp_test, 0664, displayport_dp_test_show, displayport_dp_test_store);
 
+/* r7: Bu cihazda (SM-N770F, s2mu106 PD chip) DP Alt Mode USB-PD seviyesinde
+ * basariyla negotiate oluyor (usbpd-s2mu106: configure_acked, src_ready)
+ * ama drivers/ccic/usbpd_manager.c'deki MANAGER_DisplayPort_Configure_ACKED
+ * case'i bos (`break;`) - CCIC_NOTIFY_DEV_DP/DP_CONNECT bildirimi hic
+ * gonderilmiyor. Bu, en az bir baska Samsung cihazinda (ayni s2mu106 PD
+ * chip, farkli model) da AYNI sekilde bos - r7'ye ozel bir hata degil,
+ * hicbir yerde calistigi dogrulanmamis bir kod yolu (bkz. device-info/
+ * HDMI-DP-MASAUSTU.md). displayport->ccic_cable_state alanini etkileyen
+ * baska hicbir userspace-erisilebilir arayuz yok (sistematik olarak
+ * arandi) - bu yuzden mevcut dp_test debug deseniyle TUTARLI, izole,
+ * minimal bir debug yazma arayuzu ekleniyor. usbpd_manager.c'nin karmasik
+ * PD/VDM state machine'ine DOKUNMUYOR - yalnizca hpd_changed()'in erken
+ * "ccic cable is detached" kontrolunu manuel asmaya yariyor, boylece PHY/
+ * link-training katmanini (ayri bir olasi engel) izole test edebiliyoruz. */
+static ssize_t displayport_ccic_test_show(struct class *class,
+		struct class_attribute *attr, char *buf)
+{
+	struct displayport_device *displayport = get_displayport_drvdata();
+
+	return snprintf(buf, PAGE_SIZE, "ccic_cable_state: %llu (0=DETACH, 1=ATTACH)\n",
+			displayport->ccic_cable_state);
+}
+
+static ssize_t displayport_ccic_test_store(struct class *dev,
+		struct class_attribute *attr,
+		const char *buf, size_t size)
+{
+	struct displayport_device *displayport = get_displayport_drvdata();
+	int val[2] = {0,};
+
+	if (strnchr(buf, size, '-')) {
+		pr_err("%s range option not allowed\n", __func__);
+		return -EINVAL;
+	}
+
+	get_options(buf, 2, val);
+
+	if (val[1] == 0 || val[1] == 1) {
+		displayport_info("r7: manual ccic_cable_state override -> %d\n", val[1]);
+		displayport->ccic_cable_state = val[1];
+	}
+
+	return size;
+}
+static CLASS_ATTR(ccic_test, 0664, displayport_ccic_test_show, displayport_ccic_test_store);
+
 extern int forced_resolution;
 static ssize_t displayport_forced_resolution_show(struct class *class,
 		struct class_attribute *attr, char *buf)
@@ -4450,6 +4496,9 @@ static int displayport_probe(struct platform_device *pdev)
 			ret = class_create_file(dp_class, &class_attr_dp_test);
 			if (ret)
 				displayport_err("failed to create attr_dp_test\n");
+			ret = class_create_file(dp_class, &class_attr_ccic_test);
+			if (ret)
+				displayport_err("failed to create attr_ccic_test\n");
 			ret = class_create_file(dp_class, &class_attr_forced_resolution);
 			if (ret)
 				displayport_err("failed to create attr_dp_forced_resolution\n");
