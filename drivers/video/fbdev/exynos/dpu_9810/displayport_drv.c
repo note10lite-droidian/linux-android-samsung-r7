@@ -1079,6 +1079,67 @@ void displayport_audio_init_config(void)
 	displayport_reg_print_audio_state();
 }
 
+/* r7: displayport_reg_init()/reg_phy_init() (asagida hpd_changed(1) icinde
+ * cagriliyor) PLL kilitlemeye calisirken asagidaki 4 katman henuz devrede
+ * degil - normal surucu akisinda bunlar ya cok GEC (pm_runtime, sadece
+ * displayport_enable() icinde, link training BASARILI olduktan SONRA
+ * calisiyor) ya da HIC YOK (FSYS0 clock domain'i + paylasimli combo PHY
+ * software-enable biti + phy_power_on() framework cagrisi - devicetree'de
+ * hicbir tuketici tarafindan referans edilmedigi icin normal akista hic
+ * tetiklenmiyor). Debug sysfs hook'lariyla (combo_phy_test, phy_power_test,
+ * dp_pm_test, dp_clk_test - asagida ~4074-4297) her biri ayri ayri
+ * dogrulandi. Bu fonksiyon onlari HPD gelir gelmez, dogru sirada,
+ * otomatik olarak devreye sokuyor. */
+static void displayport_r7_hw_workaround(struct displayport_device *displayport, int on)
+{
+	static const char * const clk_names[] = {
+		"GATE_DP_LINK", "GATE_DP_LINK_GTC", "GATE_USB30DRD_USBDPPHY"
+	};
+	struct clk *c;
+	u32 val;
+	int i;
+
+	if (on) {
+		pm_runtime_get_sync(displayport->dev);
+
+		for (i = 0; i < ARRAY_SIZE(clk_names); i++) {
+			c = __clk_lookup(clk_names[i]);
+			if (c)
+				clk_prepare_enable(c);
+			else
+				displayport_err("r7: clk %s not found\n", clk_names[i]);
+		}
+
+		if (displayport->res.usbdp_regs) {
+			val = readl(displayport->res.usbdp_regs);
+			writel(val | 0x1, displayport->res.usbdp_regs);
+		}
+
+		if (displayport->phy)
+			phy_power_on(displayport->phy);
+
+		displayport_info("r7: hw_workaround(on) done\n");
+	} else {
+		if (displayport->phy)
+			phy_power_off(displayport->phy);
+
+		if (displayport->res.usbdp_regs) {
+			val = readl(displayport->res.usbdp_regs);
+			writel(val & ~0x1, displayport->res.usbdp_regs);
+		}
+
+		for (i = 0; i < ARRAY_SIZE(clk_names); i++) {
+			c = __clk_lookup(clk_names[i]);
+			if (c)
+				clk_disable_unprepare(c);
+		}
+
+		pm_runtime_put_sync(displayport->dev);
+
+		displayport_info("r7: hw_workaround(off) done\n");
+	}
+}
+
 void displayport_hpd_changed(int state)
 {
 	int ret;
@@ -1107,6 +1168,7 @@ void displayport_hpd_changed(int state)
 		displayport->best_video = EDID_DEFAULT_TIMINGS_IDX;
 		auth_done = HDCP_2_2_NOT_AUTH;
 		/* PHY power on */
+		displayport_r7_hw_workaround(displayport, 1);
 		displayport_reg_sw_reset();
 		displayport_reg_init(); /* for AUX ch read/write. */
 		displayport->state = DISPLAYPORT_STATE_INIT;
@@ -1222,6 +1284,7 @@ void displayport_hpd_changed(int state)
 
 		pm_relax(displayport->dev);
 		displayport->hdcp_ver = 0;
+		displayport_r7_hw_workaround(displayport, 0);
 	}
 	mutex_unlock(&displayport->hpd_lock);
 
@@ -1230,6 +1293,7 @@ void displayport_hpd_changed(int state)
 HPD_FAIL:
 	displayport_reg_deinit();
 	displayport_reg_phy_disable();
+	displayport_r7_hw_workaround(displayport, 0);
 	pm_relax(displayport->dev);
 	displayport->hpd_current_state = 0;
 	displayport->hpd_state = HPD_UNPLUG;
