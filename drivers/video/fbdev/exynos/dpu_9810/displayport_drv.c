@@ -4057,6 +4057,67 @@ static ssize_t displayport_dp_pin_test_store(struct class *dev,
 }
 static CLASS_ATTR(dp_pin_test, 0664, displayport_dp_pin_test_show, displayport_dp_pin_test_store);
 
+/* r7: ccic_test + dp_pin_test hicbir sey degistirmedi ("combo phy disabled"
+ * ayni sekilde defalarca cikti). Kok neden: displayport_phy_enabled()
+ * (displayport.h) USBDP_PHY_CONTROL (0x14060704) register'inin bit 0'ini
+ * okuyor; kapaliysa TUM phy_read/write cagrilari sessizce atlaniyor.
+ * Bu register'i YAZAN hicbir fonksiyon kernel agacinda bulunamadi:
+ * displayport_drv.c yalnizca ioremap ile OKUYOR (2901. satir);
+ * phy-exynos-usbdrd.h'de "EXYNOS_USBDP_PHY_CONTROL" (0x704, ayni offset)
+ * tanimli ama phy-exynos-usbdrd.c'de HIC KULLANILMIYOR. exynos_usbdrd_
+ * inform_dp_use() de bu biti ACMIYOR, yalnizca "acik ise kapatma" bayragi.
+ * Yani bu ozellik Samsung'un kendi kernel kaynaginda TAMAMLANMAMIS -
+ * Halium'a ozel bir eksiklik degil (device-info/HDMI-DP-MASAUSTU.md).
+ * Bu son, izole debug hook: register'i dogrudan read-modify-write ile
+ * (bit 0 disindaki bitlere DOKUNMADAN) 0/1 yapiyor - PLL'in bu bit
+ * acilinca kilitlenip kilitlenmedigini test etmek icin. */
+static ssize_t displayport_combo_phy_test_show(struct class *class,
+		struct class_attribute *attr, char *buf)
+{
+	struct displayport_device *displayport = get_displayport_drvdata();
+	u32 val = 0;
+
+	if (displayport->res.usbdp_regs)
+		val = readl(displayport->res.usbdp_regs);
+
+	return snprintf(buf, PAGE_SIZE, "USBDP_PHY_CONTROL: 0x%08x (bit0=%d)\n",
+			val, val & 0x1);
+}
+
+static ssize_t displayport_combo_phy_test_store(struct class *dev,
+		struct class_attribute *attr,
+		const char *buf, size_t size)
+{
+	struct displayport_device *displayport = get_displayport_drvdata();
+	int val[2] = {0,};
+	u32 old;
+
+	if (strnchr(buf, size, '-')) {
+		pr_err("%s range option not allowed\n", __func__);
+		return -EINVAL;
+	}
+
+	get_options(buf, 2, val);
+
+	if (!displayport->res.usbdp_regs) {
+		displayport_err("r7: usbdp_regs not mapped\n");
+		return size;
+	}
+
+	if (val[1] == 0 || val[1] == 1) {
+		old = readl(displayport->res.usbdp_regs);
+		displayport_info("r7: manual USBDP_PHY_CONTROL bit0 override -> %d (was 0x%08x)\n",
+				val[1], old);
+		if (val[1])
+			writel(old | 0x1, displayport->res.usbdp_regs);
+		else
+			writel(old & ~0x1, displayport->res.usbdp_regs);
+	}
+
+	return size;
+}
+static CLASS_ATTR(combo_phy_test, 0664, displayport_combo_phy_test_show, displayport_combo_phy_test_store);
+
 extern int forced_resolution;
 static ssize_t displayport_forced_resolution_show(struct class *class,
 		struct class_attribute *attr, char *buf)
@@ -4545,6 +4606,9 @@ static int displayport_probe(struct platform_device *pdev)
 			ret = class_create_file(dp_class, &class_attr_dp_pin_test);
 			if (ret)
 				displayport_err("failed to create attr_dp_pin_test\n");
+			ret = class_create_file(dp_class, &class_attr_combo_phy_test);
+			if (ret)
+				displayport_err("failed to create attr_combo_phy_test\n");
 			ret = class_create_file(dp_class, &class_attr_forced_resolution);
 			if (ret)
 				displayport_err("failed to create attr_dp_forced_resolution\n");
