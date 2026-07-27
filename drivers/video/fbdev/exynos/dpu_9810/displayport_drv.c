@@ -4171,6 +4171,65 @@ static ssize_t displayport_phy_power_test_store(struct class *dev,
 }
 static CLASS_ATTR(phy_power_test, 0664, displayport_phy_power_test_show, displayport_phy_power_test_store);
 
+/* r7: combo_phy_test + phy_power_test (dogru phy - displayport_phy@110A0000,
+ * "samsung,displayport-phy", phy-exynos-displayport.c - ONCEKI phy_power_
+ * test yaniligindan phy-exynos-usbdrd.c'yi hedefliyordu, YANLIS surucuydu;
+ * displayport->phy aslinda BU kucuk, ayri isolation-toggle surucusune
+ * baglaniyor) hala PLL'i kilitlemedi. Canli kontrol: /sys/kernel/debug/clk/
+ * GATE_DP_LINK ve GATE_USB30DRD_USBDPPHY enable_count=0; /sys/devices/
+ * platform/11090000.displayport/power/runtime_status = "suspended".
+ * displayport_drv.c'nin "aclk" (register-bus saati) SADECE
+ * displayport_runtime_resume() icinde aciliyor, o da SADECE
+ * pm_runtime_get_sync(displayport->dev) cagrilinca calisiyor - ve bu cagri
+ * TEK yerde var: displayport_enable() (satir ~2424), ki bu fonksiyon
+ * BASARILI link training'den SONRA calisiyor. Yani register-bus saati,
+ * link training'in kendisini yapmaya calisirken HENUZ ACIK DEGIL - devre
+ * disi biriken bir sira hatasi/eksik CCIC zincirinin parcasi. Bu debug
+ * hook `pm_runtime_get_sync()`'i HPD tetiklemeden ONCE manuel cagiriyor. */
+static ssize_t displayport_pm_test_show(struct class *class,
+		struct class_attribute *attr, char *buf)
+{
+	struct displayport_device *displayport = get_displayport_drvdata();
+
+	if (!displayport->dev)
+		return snprintf(buf, PAGE_SIZE, "displayport->dev is NULL\n");
+
+	return snprintf(buf, PAGE_SIZE, "runtime_status=%d (0=active,1=resuming,2=susp,3=susp'ing)\n",
+			displayport->dev->power.runtime_status);
+}
+
+static ssize_t displayport_pm_test_store(struct class *dev,
+		struct class_attribute *attr,
+		const char *buf, size_t size)
+{
+	struct displayport_device *displayport = get_displayport_drvdata();
+	int val[2] = {0,};
+	int ret;
+
+	if (strnchr(buf, size, '-')) {
+		pr_err("%s range option not allowed\n", __func__);
+		return -EINVAL;
+	}
+
+	get_options(buf, 2, val);
+
+	if (!displayport->dev) {
+		displayport_err("r7: displayport->dev is NULL\n");
+		return size;
+	}
+
+	if (val[1] == 1) {
+		ret = pm_runtime_get_sync(displayport->dev);
+		displayport_info("r7: manual pm_runtime_get_sync() -> ret=%d\n", ret);
+	} else if (val[1] == 0) {
+		ret = pm_runtime_put_sync(displayport->dev);
+		displayport_info("r7: manual pm_runtime_put_sync() -> ret=%d\n", ret);
+	}
+
+	return size;
+}
+static CLASS_ATTR(dp_pm_test, 0664, displayport_pm_test_show, displayport_pm_test_store);
+
 extern int forced_resolution;
 static ssize_t displayport_forced_resolution_show(struct class *class,
 		struct class_attribute *attr, char *buf)
@@ -4665,6 +4724,9 @@ static int displayport_probe(struct platform_device *pdev)
 			ret = class_create_file(dp_class, &class_attr_phy_power_test);
 			if (ret)
 				displayport_err("failed to create attr_phy_power_test\n");
+			ret = class_create_file(dp_class, &class_attr_dp_pm_test);
+			if (ret)
+				displayport_err("failed to create attr_dp_pm_test\n");
 			ret = class_create_file(dp_class, &class_attr_forced_resolution);
 			if (ret)
 				displayport_err("failed to create attr_dp_forced_resolution\n");
