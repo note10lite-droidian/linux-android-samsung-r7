@@ -1205,6 +1205,14 @@ void usbpd_manager_inform_event(struct usbpd_data *pd_data,
 			MANAGER_REQ_VDM_DisplayPort_Configure);
 		break;
 	case MANAGER_DisplayPort_Configure_ACKED:
+		pr_info("%s: r7: DisplayPort_Configure_ACKED -> notifying displayport_drv (DP_CONNECT+LINK_CONF+HPD)\n",
+				__func__);
+		ccic_event_work(pd_data->phy_driver_data, CCIC_NOTIFY_DEV_DP,
+				CCIC_NOTIFY_ID_DP_CONNECT, CCIC_NOTIFY_ATTACH, 0);
+		ccic_event_work(pd_data->phy_driver_data, CCIC_NOTIFY_DEV_DP,
+				CCIC_NOTIFY_ID_DP_LINK_CONF, CCIC_NOTIFY_DP_PIN_D, 0);
+		ccic_event_work(pd_data->phy_driver_data, CCIC_NOTIFY_DEV_DP,
+				CCIC_NOTIFY_ID_DP_HPD, CCIC_NOTIFY_HIGH, 0);
 		break;
 	case MANAGER_NEW_POWER_SRC:
 		usbpd_manager_command_to_policy(pd_data->dev,
