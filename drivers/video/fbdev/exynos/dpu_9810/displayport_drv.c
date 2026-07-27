@@ -3074,6 +3074,16 @@ static int displayport_usb_typec_notification_proceed(struct displayport_device 
 
 	switch (usb_typec_info->id) {
 	case CCIC_NOTIFY_ID_DP_CONNECT:
+		/* r7: displayport_usb_typec_notification_proceed() (bu fonksiyon,
+		 * CONFIG_USE_DISPLAYPORT_CCIC_EVENT_QUEUE kapali oldugunda
+		 * KULLANILAN gercek yol) ccic_cable_state'i HICBIR ZAMAN set
+		 * etmiyordu - bu atama sadece kapali-config'in "kuyruklu" kardes
+		 * fonksiyonunda (usb_typec_displayport_notification(), asagida)
+		 * vardi, yani olu koddu. Sonuc: DP_CONNECT bildirimi gelse bile
+		 * ccic_cable_state hep varsayilan DETACH(0) kaliyordu, HPD islemi
+		 * 10-11ms'lik ilk usleep'ten sonraki "ccic cable is detached"
+		 * kontrolune her seferinde takiliyordu. */
+		displayport->ccic_cable_state = usb_typec_info->sub1;
 		switch (usb_typec_info->sub1) {
 		case CCIC_NOTIFY_DETACH:
 			dp_logger_set_max_count(100);
