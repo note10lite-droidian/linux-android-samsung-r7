@@ -4118,6 +4118,59 @@ static ssize_t displayport_combo_phy_test_store(struct class *dev,
 }
 static CLASS_ATTR(combo_phy_test, 0664, displayport_combo_phy_test_show, displayport_combo_phy_test_store);
 
+/* r7: combo_phy_test (yukarida) USBDP_PHY_CONTROL bit0'ini actinca "combo
+ * phy disabled" mesajlari tamamen kayboldu (register yazmalari donanima
+ * ulasiyor) ama PLL HALA kilitlenmiyor, DPCD okumasi hala sifir. Kok neden:
+ * displayport_drv.c standart Linux PHY cercevesinden `displayport->phy =
+ * devm_phy_get(...)` ile bir phy handle aliyor ve probe'da BIR KEZ
+ * `phy_init(displayport->phy)` cagiriyor (satir ~4549) ama HICBIR YERDE
+ * `phy_power_on(displayport->phy)` cagirmiyor. Bu paylasimli combo PHY'nin
+ * gercek guc-acma/izolasyon-kaldirma islemini yapan asil fonksiyon budur
+ * (phy-exynos-usbdrd.c: exynos_usbdrd_phy_power_on() -> regulator_enable
+ * + phy_isol(...,0,...) ile PHY'yi elektriksel olarak devreye sokuyor).
+ * USB3 SuperSpeed hatti da tamamen bos oldugundan (dogrulandi - hicbir
+ * cihaz o hatti kullanmiyor) bu shared phy hicbir yoldan power_on
+ * cagrisini almiyor, yani donanim tamamen izole/gucsuz kalmis olabilir.
+ * Bu, standart PHY cercevesi API'sini (raw register yerine) kullanan son
+ * debug hook: manuel `phy_power_on()`/`phy_power_off()` tetiklemesi. */
+static ssize_t displayport_phy_power_test_show(struct class *class,
+		struct class_attribute *attr, char *buf)
+{
+	return snprintf(buf, PAGE_SIZE, "write 1=phy_power_on, 0=phy_power_off\n");
+}
+
+static ssize_t displayport_phy_power_test_store(struct class *dev,
+		struct class_attribute *attr,
+		const char *buf, size_t size)
+{
+	struct displayport_device *displayport = get_displayport_drvdata();
+	int val[2] = {0,};
+	int ret;
+
+	if (strnchr(buf, size, '-')) {
+		pr_err("%s range option not allowed\n", __func__);
+		return -EINVAL;
+	}
+
+	get_options(buf, 2, val);
+
+	if (!displayport->phy) {
+		displayport_err("r7: displayport->phy is NULL\n");
+		return size;
+	}
+
+	if (val[1] == 1) {
+		ret = phy_power_on(displayport->phy);
+		displayport_info("r7: manual phy_power_on() -> ret=%d\n", ret);
+	} else if (val[1] == 0) {
+		ret = phy_power_off(displayport->phy);
+		displayport_info("r7: manual phy_power_off() -> ret=%d\n", ret);
+	}
+
+	return size;
+}
+static CLASS_ATTR(phy_power_test, 0664, displayport_phy_power_test_show, displayport_phy_power_test_store);
+
 extern int forced_resolution;
 static ssize_t displayport_forced_resolution_show(struct class *class,
 		struct class_attribute *attr, char *buf)
@@ -4609,6 +4662,9 @@ static int displayport_probe(struct platform_device *pdev)
 			ret = class_create_file(dp_class, &class_attr_combo_phy_test);
 			if (ret)
 				displayport_err("failed to create attr_combo_phy_test\n");
+			ret = class_create_file(dp_class, &class_attr_phy_power_test);
+			if (ret)
+				displayport_err("failed to create attr_phy_power_test\n");
 			ret = class_create_file(dp_class, &class_attr_forced_resolution);
 			if (ret)
 				displayport_err("failed to create attr_dp_forced_resolution\n");
