@@ -4014,6 +4014,49 @@ static ssize_t displayport_ccic_test_store(struct class *dev,
 }
 static CLASS_ATTR(ccic_test, 0664, displayport_ccic_test_show, displayport_ccic_test_store);
 
+/* r7: ccic_test (yukarida) "ccic cable is detached" engelini asti, ama
+ * displayport_reg_phy_mode_setting() (displayport_reg.c) displayport->
+ * ccic_notify_dp_conf (pin assignment: 0=UNKNOWN, 1=A, 2=B, 3=C, 4=D, 5=E,
+ * 6=F) alanina gore PHY lane/clock-source register'larini yaziyor. Bu alan
+ * da AYNI eksik CCIC_NOTIFY_ID_DP_LINK_CONF bildiriminden geldigi icin hep
+ * UNKNOWN (0) kaliyor -> default case hicbir PHY lane'ini etkinlestirmiyor
+ * -> PLL kilitlenecek gecerli bir sinyal bulamiyor ("wait_phy_pll_lock
+ * timeout", DPCD okumasi sifir). Bu alani da ccic_test ile AYNI desende
+ * manuel ayarlanabilir yapiyoruz; hpd_changed(1) tetiklenmeden (dp_test)
+ * ONCE yazilmali, cunku displayport_reg_phy_init() bu degeri hpd_changed
+ * akisinin baslarinda okuyor. GUNLUK G27.4, device-info/HDMI-DP-MASAUSTU.md. */
+static ssize_t displayport_dp_pin_test_show(struct class *class,
+		struct class_attribute *attr, char *buf)
+{
+	struct displayport_device *displayport = get_displayport_drvdata();
+
+	return snprintf(buf, PAGE_SIZE, "ccic_notify_dp_conf: %d (0=UNKNOWN,1=A,2=B,3=C,4=D,5=E,6=F)\n",
+			displayport->ccic_notify_dp_conf);
+}
+
+static ssize_t displayport_dp_pin_test_store(struct class *dev,
+		struct class_attribute *attr,
+		const char *buf, size_t size)
+{
+	struct displayport_device *displayport = get_displayport_drvdata();
+	int val[2] = {0,};
+
+	if (strnchr(buf, size, '-')) {
+		pr_err("%s range option not allowed\n", __func__);
+		return -EINVAL;
+	}
+
+	get_options(buf, 2, val);
+
+	if (val[1] >= 0 && val[1] <= 6) {
+		displayport_info("r7: manual ccic_notify_dp_conf override -> %d\n", val[1]);
+		displayport->ccic_notify_dp_conf = val[1];
+	}
+
+	return size;
+}
+static CLASS_ATTR(dp_pin_test, 0664, displayport_dp_pin_test_show, displayport_dp_pin_test_store);
+
 extern int forced_resolution;
 static ssize_t displayport_forced_resolution_show(struct class *class,
 		struct class_attribute *attr, char *buf)
@@ -4499,6 +4542,9 @@ static int displayport_probe(struct platform_device *pdev)
 			ret = class_create_file(dp_class, &class_attr_ccic_test);
 			if (ret)
 				displayport_err("failed to create attr_ccic_test\n");
+			ret = class_create_file(dp_class, &class_attr_dp_pin_test);
+			if (ret)
+				displayport_err("failed to create attr_dp_pin_test\n");
 			ret = class_create_file(dp_class, &class_attr_forced_resolution);
 			if (ret)
 				displayport_err("failed to create attr_dp_forced_resolution\n");
