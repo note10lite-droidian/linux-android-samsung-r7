@@ -4370,6 +4370,43 @@ static ssize_t displayport_clk_test_store(struct class *dev,
 }
 static CLASS_ATTR(dp_clk_test, 0664, displayport_clk_test_show, displayport_clk_test_store);
 
+/* r7: AUX kanali DPCD okumalarinda tamamen sessiz (hep 0x00) - r7'de gpio_usb_dir
+ * yok (dp,usb_con_sel DT ozelligi yok), yani kablo yonu (CC1/CC2) hicbir zaman
+ * okunamiyor ve displayport_reg_set_aux_pn_inv() (AUX_CONTROL register'inda
+ * AUX+/AUX- polarite ters cevirme biti - donanimda hazir, harici cip GEREKTIRMEZ)
+ * TUM surucude HICBIR YERDEN cagirilmiyor (olu kod, tanimli ama kullanilmiyor).
+ * Eger fiziksel kablo yonu ters polarite gerektiriyorsa, AUX sinyali elektriksel
+ * olarak baglı ama Manchester kodu ters okunuyor olabilir - bu da "sinyal yok"
+ * gibi gorunen sifir okumalari acikliyor olabilir. Bu debug hook, yeniden
+ * derlemeden iki degeri de (0/1) canli test etmek icin. */
+static ssize_t displayport_aux_pn_inv_test_show(struct class *class,
+		struct class_attribute *attr, char *buf)
+{
+	return snprintf(buf, PAGE_SIZE, "write 0 or 1 -> AUX_PN_INV\n");
+}
+
+static ssize_t displayport_aux_pn_inv_test_store(struct class *dev,
+		struct class_attribute *attr,
+		const char *buf, size_t size)
+{
+	int val[2] = {0,};
+
+	if (strnchr(buf, size, '-')) {
+		pr_err("%s range option not allowed\n", __func__);
+		return -EINVAL;
+	}
+
+	get_options(buf, 2, val);
+
+	if (val[1] == 0 || val[1] == 1) {
+		displayport_reg_set_aux_pn_inv(val[1]);
+		displayport_info("r7: manual displayport_reg_set_aux_pn_inv(%d)\n", val[1]);
+	}
+
+	return size;
+}
+static CLASS_ATTR(aux_pn_inv_test, 0664, displayport_aux_pn_inv_test_show, displayport_aux_pn_inv_test_store);
+
 extern int forced_resolution;
 static ssize_t displayport_forced_resolution_show(struct class *class,
 		struct class_attribute *attr, char *buf)
@@ -4870,6 +4907,9 @@ static int displayport_probe(struct platform_device *pdev)
 			ret = class_create_file(dp_class, &class_attr_dp_clk_test);
 			if (ret)
 				displayport_err("failed to create attr_dp_clk_test\n");
+			ret = class_create_file(dp_class, &class_attr_aux_pn_inv_test);
+			if (ret)
+				displayport_err("failed to create attr_aux_pn_inv_test\n");
 			ret = class_create_file(dp_class, &class_attr_forced_resolution);
 			if (ret)
 				displayport_err("failed to create attr_dp_forced_resolution\n");
