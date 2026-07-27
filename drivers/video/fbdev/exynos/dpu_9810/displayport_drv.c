@@ -4230,6 +4230,72 @@ static ssize_t displayport_pm_test_store(struct class *dev,
 }
 static CLASS_ATTR(dp_pm_test, 0664, displayport_pm_test_show, displayport_pm_test_store);
 
+/* r7: pm_runtime_get_sync() calisti (runtime_status=active), ama /sys/
+ * kernel/debug/clk/GATE_DP_LINK ve GATE_USB30DRD_USBDPPHY hala
+ * enable_count=0 kaldi - bunlar "aclk"tan (CLK_DPU_BASE+0, CMU_DPU) TAMAMEN
+ * FARKLI bir clock domain'de (CLK_FSYS0_BASE+0/+1, CMU_FSYS0). Kaynak
+ * arastirmasi: displayport@0x11090000 devicetree dugumunun "clocks"
+ * ozelligi YALNIZCA "aclk"yi listeliyor - GATE_DP_LINK (700/0x2bc) ve
+ * GATE_DP_LINK_GTC (701/0x2bd) HICBIR devicetree dugumunde HICBIR
+ * tuketici tarafindan referans edilmiyor (tum .dts tarandi, dogrulandi).
+ * Yani standart clk framework (devm_clk_get) ile bu saatlere ulasilamiyor
+ * - bu gercek bir devicetree eksikligi. Bu debug hook, DT'ye dokunmadan,
+ * cekirdek-ici __clk_lookup() (isimle global arama, DT gerektirmez) ile
+ * bu saatleri dogrudan bulup clk_prepare_enable() cagiriyor - test amacli,
+ * DT+surucu kalici yamasindan ONCE hizli dogrulama. */
+static ssize_t displayport_clk_test_show(struct class *class,
+		struct class_attribute *attr, char *buf)
+{
+	struct clk *c;
+	int ret = 0;
+	const char *names[] = { "GATE_DP_LINK", "GATE_DP_LINK_GTC", "GATE_USB30DRD_USBDPPHY" };
+	int i;
+
+	for (i = 0; i < ARRAY_SIZE(names); i++) {
+		c = __clk_lookup(names[i]);
+		ret += scnprintf(buf + ret, PAGE_SIZE - ret, "%s: %s enable_count=%d\n",
+				names[i], c ? "found" : "NOT FOUND",
+				c ? __clk_get_enable_count(c) : -1);
+	}
+	return ret;
+}
+
+static ssize_t displayport_clk_test_store(struct class *dev,
+		struct class_attribute *attr,
+		const char *buf, size_t size)
+{
+	struct clk *c;
+	int val[2] = {0,};
+	int ret;
+	const char *names[] = { "GATE_DP_LINK", "GATE_DP_LINK_GTC", "GATE_USB30DRD_USBDPPHY" };
+	int i;
+
+	if (strnchr(buf, size, '-')) {
+		pr_err("%s range option not allowed\n", __func__);
+		return -EINVAL;
+	}
+
+	get_options(buf, 2, val);
+
+	for (i = 0; i < ARRAY_SIZE(names); i++) {
+		c = __clk_lookup(names[i]);
+		if (!c) {
+			displayport_err("r7: clk %s not found\n", names[i]);
+			continue;
+		}
+		if (val[1] == 1) {
+			ret = clk_prepare_enable(c);
+			displayport_info("r7: manual clk_prepare_enable(%s) -> ret=%d\n", names[i], ret);
+		} else if (val[1] == 0) {
+			clk_disable_unprepare(c);
+			displayport_info("r7: manual clk_disable_unprepare(%s)\n", names[i]);
+		}
+	}
+
+	return size;
+}
+static CLASS_ATTR(dp_clk_test, 0664, displayport_clk_test_show, displayport_clk_test_store);
+
 extern int forced_resolution;
 static ssize_t displayport_forced_resolution_show(struct class *class,
 		struct class_attribute *attr, char *buf)
@@ -4727,6 +4793,9 @@ static int displayport_probe(struct platform_device *pdev)
 			ret = class_create_file(dp_class, &class_attr_dp_pm_test);
 			if (ret)
 				displayport_err("failed to create attr_dp_pm_test\n");
+			ret = class_create_file(dp_class, &class_attr_dp_clk_test);
+			if (ret)
+				displayport_err("failed to create attr_dp_clk_test\n");
 			ret = class_create_file(dp_class, &class_attr_forced_resolution);
 			if (ret)
 				displayport_err("failed to create attr_dp_forced_resolution\n");
