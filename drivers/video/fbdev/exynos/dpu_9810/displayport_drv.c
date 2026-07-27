@@ -1171,6 +1171,9 @@ void displayport_hpd_changed(int state)
 		displayport_r7_hw_workaround(displayport, 1);
 		displayport_reg_sw_reset();
 		displayport_reg_init(); /* for AUX ch read/write. */
+		/* r7 test: AUX_PN_INV hicbir yerde cagirilmiyordu (bkz Adim 15) -
+		 * kablo yonu GPIO'su olmadigi icin sabit deger ile canli test */
+		displayport_reg_set_aux_pn_inv(1);
 		displayport->state = DISPLAYPORT_STATE_INIT;
 		usleep_range(10000, 11000);
 
