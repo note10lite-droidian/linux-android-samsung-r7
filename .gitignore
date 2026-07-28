@@ -1,0 +1,163 @@
+#
+# NOTE! Don't add files that are generated in specific
+# subdirectories here. Add them in the ".gitignore" file
+# in that subdirectory instead.
+#
+# NOTE! Please use 'git ls-files -i --exclude-standard'
+# command after changing this file, to see if there are
+# any tracked files which get ignored after the change.
+#
+
+#
+# Normal rules
+#
+*.o
+*.o.*
+*.a
+*.s
+*.ko
+*.so
+*.so.dbg
+*.mod
+*.mod.c
+*.i
+*.lst
+*.symtypes
+*.order
+*.elf
+*.bin
+*.tar
+*.gz
+*.bz2
+*.lzma
+*.xz
+*.lz4
+*.lzo
+*.gcno
+*.dwo
+*.su
+*.c.[012]*.*
+*.cmd
+modules.builtin
+Module.symvers
+
+#
+# Top-level generic files
+#
+# NOTE: these are anchored with a leading '/' on purpose. A bare
+# "vmlinux*" pattern also swallows arch/*/kernel/vmlinux.lds.S and
+# include/asm-generic/vmlinux.lds.h, which are real SOURCE files the
+# kernel cannot be linked without. Do not un-anchor these.
+#
+/tags
+/TAGS
+/linux
+/vmlinux
+/vmlinux.32
+/vmlinux-gdb.py
+/vmlinuz
+/System.map
+/Module.markers
+/.config
+/.config.old
+/.version
+/.missing-syscalls.d
+
+#
+# Out-of-tree build output (O=out/KERNEL_OBJ)
+#
+/out/
+/build.log
+.tmp_versions/
+/.tmp_*
+
+#
+# Generated include files
+#
+include/config/
+include/generated/
+arch/*/include/generated/
+
+#
+# Generated during the build from in-tree sources
+#
+/firmware/**/*.gen.S
+/firmware/**/*.fw
+/drivers/tty/vt/consolemap_deftbl.c
+/drivers/tty/vt/defkeymap.c
+/security/selinux/av_permissions.h
+/security/selinux/flask.h
+/security/samsung/defex_lsm/cert/pubkey_*.der
+/security/samsung/defex_lsm/defex_packed_rules.bin
+/usr/gen_init_cpio
+/usr/initramfs_data.cpio*
+/lib/crc32table.h
+/lib/oid_registry_data.c
+/lib/gen_crc32table
+/crypto/*-asn1.[ch]
+/kernel/config_data.*
+**/__pycache__/
+*.pyc
+
+#
+# Host tools compiled under scripts/
+#
+/scripts/asn1_compiler
+/scripts/basic/bin2c
+/scripts/basic/fixdep
+/scripts/conmakehash
+/scripts/dtc/dtc
+/scripts/extract-cert
+/scripts/genksyms/genksyms
+/scripts/kallsyms
+/scripts/kconfig/conf
+/scripts/mod/elfconfig.h
+/scripts/mod/devicetable-offsets.h
+/scripts/mod/mk_elfconfig
+/scripts/mod/modpost
+/scripts/recordmcount
+/scripts/sign-file
+/scripts/sortextable
+/scripts/selinux/**/genheaders
+/scripts/selinux/**/mdp
+/scripts/**/*.lex.c
+/scripts/**/*.tab.[ch]
+/scripts/**/*.hash.c
+
+#
+# Debian packaging: keep the sources, drop everything debuild generates
+#
+/debian/binbridge/
+/debian/files
+/debian/debhelper-build-stamp
+/debian/*.substvars
+/debian/*.debhelper
+/debian/*.debhelper.log
+/debian/linux-bootimage-*/
+/debian/linux-headers-*/
+/debian/linux-image-*/
+/debian/tmp/
+
+#
+# Leavings from module signing
+#
+extra_certificates
+signing_key.pem
+signing_key.priv
+signing_key.x509
+x509.genkey
+
+#
+# Editor / misc
+#
+*.orig
+*.rej
+*~
+\#*#
+*.swp
+cscope.*
+ncscope.*
+GPATH
+GRTAGS
+GSYMS
+GTAGS
