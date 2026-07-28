@@ -2,6 +2,16 @@
 # kbuild file for firmware/
 #
 
+# Out-of-tree (O=) build fix:
+# fw-shipped-y writes a RELATIVE .incbin path into the generated .gen.S
+# files (see cmd_fwbin further down). kbuild sets VPATH=$(srctree), so
+# *make* finds the firmware blob - but the *assembler* that processes the
+# .incbin directive knows nothing about VPATH and looks in objtree:
+#     firmware/xxx.fw.gen.S:5: Error: file not found: firmware/xxx.fw
+# Handing srctree to the assembler as an include path fixes it. For an
+# in-tree build srctree is "." so behaviour is unchanged.
+asflags-y += -I$(srctree)
+
 # Create $(fwabs) from $(CONFIG_EXTRA_FIRMWARE_DIR) -- if it doesn't have a
 # leading /, it's relative to $(srctree).
 fwdir := $(subst $(quote),,$(CONFIG_EXTRA_FIRMWARE_DIR))
