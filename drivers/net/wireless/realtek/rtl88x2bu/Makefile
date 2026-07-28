@@ -1,10 +1,11 @@
 ccflags-y += $(USER_EXTRA_CFLAGS)
 ccflags-y += -O1
-# clang-9 (AOSP r353983c) bazi GCC -Wno-* bayraklarini tanimiyor
-# (-Wno-int-in-bool-context, -Wno-misleading-indentation, -Wno-stringop-overread);
-# -Werror,-Wunknown-warning-option ile olumcul hataya donusuyorlardi. Bu bayrak
-# clang'in bilinmeyen -Wno-*'lari sessizce gecmesini saglar (ana kernelde
-# -Wno-unused-but-set-variable kaldirmamizla ayni sinif toolchain-nesil sorunu).
+# clang-9 (AOSP r353983c) does not know some of the GCC -Wno-* flags this
+# driver passes (-Wno-int-in-bool-context, -Wno-misleading-indentation,
+# -Wno-stringop-overread), and -Werror,-Wunknown-warning-option turns each of
+# them into a fatal error. This flag makes clang skip unknown -Wno-* silently.
+# Same class of toolchain-generation problem as dropping
+# -Wno-unused-but-set-variable from the main kernel's KCFLAGS.
 ccflags-y += -Wno-unknown-warning-option
 #ccflags-y += -O3
 #ccflags-y += -Wall
