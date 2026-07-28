@@ -39,7 +39,7 @@
 static LIST_HEAD(mgmt_chan_list);
 static DEFINE_MUTEX(mgmt_chan_list_lock);
 
-// static DEFINE_IDA(sock_cookie_ida);
+static DEFINE_IDA(sock_cookie_ida);
 
 static atomic_t monitor_promisc = ATOMIC_INIT(0);
 
@@ -83,7 +83,6 @@ u32 hci_sock_get_cookie(struct sock *sk)
 {
 	return hci_pi(sk)->cookie;
 }
-/*
 static bool hci_sock_gen_cookie(struct sock *sk)
 {
 	int id = hci_pi(sk)->cookie;
@@ -110,7 +109,6 @@ static void hci_sock_free_cookie(struct sock *sk)
 		ida_simple_remove(&sock_cookie_ida, id);
 	}
 }
-*/
 static inline int hci_test_bit(int nr, const void *addr)
 {
 	return *((const __u32 *) addr + (nr >> 5)) & ((__u32) 1 << (nr & 31));
@@ -474,7 +472,6 @@ static struct sk_buff *create_monitor_event(struct hci_dev *hdev, int event)
 
 	return skb;
 }
-/*
 static struct sk_buff *create_monitor_ctrl_open(struct sock *sk)
 {
 	struct hci_mon_hdr *hdr;
@@ -570,7 +567,6 @@ static struct sk_buff *create_monitor_ctrl_close(struct sock *sk)
 
 	return skb;
 }
-*/
 static struct sk_buff *create_monitor_ctrl_command(struct sock *sk, u16 index,
 						   u16 opcode, u16 len,
 						   const void *buf)
@@ -597,7 +593,6 @@ static struct sk_buff *create_monitor_ctrl_command(struct sock *sk, u16 index,
 
 	return skb;
 }
-/*
 static void __printf(2, 3)
 send_monitor_note(struct sock *sk, const char *fmt, ...)
 {
@@ -691,7 +686,6 @@ static void send_monitor_control_replay(struct sock *mon_sk)
 
 	read_unlock(&hci_sk_list.lock);
 }
-*/
 /* Generate internal stack event */
 static void hci_si_event(struct hci_dev *hdev, int type, int dlen, void *data)
 {
@@ -817,7 +811,6 @@ EXPORT_SYMBOL(hci_mgmt_chan_unregister);
 
 static int hci_sock_release(struct socket *sock)
 {
-    /*
 	struct sock *sk = sock->sk;
 	struct hci_dev *hdev;
 	struct sk_buff *skb;
@@ -875,10 +868,8 @@ static int hci_sock_release(struct socket *sock)
 	skb_queue_purge(&sk->sk_write_queue);
 
 	sock_put(sk);
-    */
 	return 0;
 }
-/*
 static int hci_sock_blacklist_add(struct hci_dev *hdev, void __user *arg)
 {
 	bdaddr_t bdaddr;
@@ -956,11 +947,9 @@ static int hci_sock_bound_ioctl(struct sock *sk, unsigned int cmd,
 
 	return -ENOIOCTLCMD;
 }
-*/
 static int hci_sock_ioctl(struct socket *sock, unsigned int cmd,
 			  unsigned long arg)
 {
-    /*
 	void __user *argp = (void __user *)arg;
 	struct sock *sk = sock->sk;
 	int err;
@@ -1050,14 +1039,11 @@ static int hci_sock_ioctl(struct socket *sock, unsigned int cmd,
 done:
 	release_sock(sk);
 	return err;
-    */
-	return 0;
 }
 
 static int hci_sock_bind(struct socket *sock, struct sockaddr *addr,
 			 int addr_len)
 {
-    /*
 	struct sockaddr_hci haddr;
 	struct sock *sk = sock->sk;
 	struct hci_dev *hdev = NULL;
@@ -1337,14 +1323,11 @@ static int hci_sock_bind(struct socket *sock, struct sockaddr *addr,
 done:
 	release_sock(sk);
 	return err;
-    */
-    return 0;
 }
 
 static int hci_sock_getname(struct socket *sock, struct sockaddr *addr,
 			    int *addr_len, int peer)
 {
-    /*
 	struct sockaddr_hci *haddr = (struct sockaddr_hci *)addr;
 	struct sock *sk = sock->sk;
 	struct hci_dev *hdev;
@@ -1371,8 +1354,6 @@ static int hci_sock_getname(struct socket *sock, struct sockaddr *addr,
 done:
 	release_sock(sk);
 	return err;
-    */
-    return 0;
 }
 
 static void hci_sock_cmsg(struct sock *sk, struct msghdr *msg,
@@ -2000,7 +1981,6 @@ static struct proto hci_sk_proto = {
 static int hci_sock_create(struct net *net, struct socket *sock, int protocol,
 			   int kern)
 {
-    /*
 	struct sock *sk;
 
 	BT_DBG("sock %p", sock);
@@ -2024,7 +2004,7 @@ static int hci_sock_create(struct net *net, struct socket *sock, int protocol,
 	sk->sk_state = BT_OPEN;
 
 	bt_sock_link(&hci_sk_list, sk);
-    */
+
 	return 0;
 }
 
