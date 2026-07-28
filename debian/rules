@@ -1,0 +1,101 @@
+#!/usr/bin/make -f
+
+include /usr/share/linux-packaging-snippets/kernel-snippet.mk
+
+# --- binbridge: an isolated toolchain dir so clang finds the RIGHT assembler ---
+#
+# Problem: the kernel Makefile derives clang's --prefix like this:
+#     GCC_TOOLCHAIN_DIR := $(dir $(shell which $(CROSS_COMPILE)elfedit))
+# The aarch64 binutils live in /usr/bin next to the HOST tools, so --prefix
+# resolves to /usr/bin/ and clang, running with -no-integrated-as, invokes the
+# host x86 assembler:
+#     /usr/bin/as: unrecognized option '-EL'
+# That breaks every cc-option probe, and the kernel then reports the
+# false negative
+#     "Cannot use CONFIG_CC_STACKPROTECTOR_STRONG: ... not supported by compiler"
+#
+# Fix: an isolated directory holding only the aarch64 tools, with the bare
+# `as`/`ld` names symlinked to the aarch64 versions too. BUILD_TRIPLET in
+# kernel-info.mk points here (CROSS_COMPILE = BUILD_TRIPLET), so --prefix
+# resolves into this directory.
+BINBRIDGE = $(CURDIR)/debian/binbridge
+
+binbridge-prepare:
+	mkdir -p $(BINBRIDGE)
+	for f in /usr/bin/aarch64-linux-gnu-* /usr/bin/aarch64-linux-android-*; do \
+		[ -e "$$f" ] && ln -sf "$$f" $(BINBRIDGE)/$$(basename $$f) || true; \
+	done
+	ln -sf /usr/bin/aarch64-linux-gnu-as $(BINBRIDGE)/as
+	ln -sf /usr/bin/aarch64-linux-gnu-ld $(BINBRIDGE)/ld
+
+# Note: the clang python2-wrapper workaround lives in kernel-info.mk as
+# BUILD_CC. The snippet puts BUILD_PATH ahead of path-override in FULL_PATH,
+# so overriding it with a symlink does not work - an absolute path is needed.
+
+# .config generation is the earliest kernel step, so binbridge must exist
+# before it. (No recipe here on purpose: we only add a prerequisite, which
+# keeps the snippet's own recipe intact.)
+out/KERNEL_OBJ/.config: binbridge-prepare
+
+# --- Samsung DT table (prebuilt) ---
+#
+# Samsung S-Boot expects a DT TABLE (magic d7b7ab1e) in the boot.img 'dtb'
+# area, not a raw DTB (magic d00dfeed). Handing it a raw DTB drops the device
+# into Odin mode:
+#     Odin mode (DT Load Fail) / [DTH] dt table header check failed
+#
+# KERNEL_PREBUILT_DT exists for exactly this, but the snippet only honours it
+# for boot header v1 and below. This device uses header v2, so it is ignored.
+#
+# Instead we reuse the snippet's dtb-merged path: KERNEL_IMAGE_DTB entries get
+# prefixed with $(KERNEL_OUT)/ and are 'cat'ed, then 'cp'ed into dtb-merged.
+# With a single input file the content passes through UNCHANGED. So we copy
+# the known-good DT table extracted from the stock boot.img into the build
+# output and point at that.
+PREBUILT_DT_NAME = samsung-dt-table.img
+
+prebuilt-dt-prepare:
+	mkdir -p $(KERNEL_OUT)
+	cp -f $(CURDIR)/debian/dt.img $(KERNEL_OUT)/$(PREBUILT_DT_NAME)
+
+out/KERNEL_OBJ/dtb-merged: prebuilt-dt-prepare
+
+# --- Building a 4.9 kernel with a modern clang: warning-class differences ---
+#
+# Samsung wrote this tree to be built with clang-8 (r349610). Newer clang
+# emits more warnings, and since the kernel builds with -Werror they become
+# fatal errors (e.g. kernel/fork.c: 'stack_vm_area' set but not used). The
+# code itself is fine; only the warning policy differs.
+#
+# KCFLAGS is appended last, so it neutralises the earlier -Werror. It also
+# tolerates dead-code warnings from the Samsung features we disabled
+# (RKP/Knox).
+#
+# Two toolchain-generation mismatches are handled here as well:
+#
+# 1) -fno-builtin-stpcpy
+#    Modern clang "optimises" strcpy+strlen patterns into a stpcpy() call.
+#    The kernel is a freestanding environment with no stpcpy:
+#        undefined reference to `stpcpy'
+#    Disabling the builtin forces clang to use functions that actually exist.
+#
+# 2) -gdwarf-4
+#    Modern clang defaults to DWARF 5; the binutils aarch64-linux-android-ld
+#    (from the GCC 4.9 era) cannot read it:
+#        Dwarf Error: found dwarf version '5', this reader only handles
+#        version 2, 3 and 4
+#    Pinning the DWARF version to 4 keeps the linker happy.
+#
+# NOTE: -Wno-unused-but-set-variable was REMOVED on purpose.
+# That flag arrived in clang-13; clang-9 does not know it, and because the
+# kernel builds with -Werror=unknown-warning-option it becomes an error:
+#     error: unknown warning option '-Wno-unused-but-set-variable'
+# which again broke every cc-option probe and produced the
+#     "Cannot use CONFIG_CC_STACKPROTECTOR_STRONG: ... not supported"
+# false negative. -Wno-error already covers that warning anyway.
+MAKEOPTS += KCFLAGS="-Wno-error -Wno-strict-prototypes -fno-builtin-stpcpy -gdwarf-4"
+
+%:
+	dh $@
+
+.PHONY: binbridge-prepare prebuilt-dt-prepare

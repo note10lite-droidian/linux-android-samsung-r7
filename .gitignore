@@ -136,6 +136,11 @@ arch/*/include/generated/
 /debian/linux-bootimage-*/
 /debian/linux-headers-*/
 /debian/linux-image-*/
+/debian/linux-*.postinst
+/debian/linux-*.postrm
+/debian/linux-*.preinst
+/debian/linux-*.prerm
+/debian/.debhelper/
 /debian/tmp/
 
 #
