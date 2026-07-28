@@ -147,7 +147,33 @@ int kbase_context_common_init(struct kbase_context *kctx)
 		struct pid *pid_struct;
 
 		rcu_read_lock();
-		pid_struct = find_get_pid(kctx->tgid);
+		/*
+		 * PID namespace fix (required for Waydroid / LXC containers):
+		 *
+		 * The original code called find_get_pid(kctx->tgid). kctx->tgid
+		 * holds a GLOBAL (init namespace) number, but the lookup chain
+		 * find_get_pid() -> find_vpid() ->
+		 * find_pid_ns(nr, task_active_pid_ns(current)) resolves that
+		 * number in the CURRENT namespace. On the host both namespaces
+		 * are the same, so the bug is invisible. Called from inside a
+		 * PID namespace the global number does not exist there, the
+		 * lookup returns NULL, and GPU context creation is rejected
+		 * with -ESRCH:
+		 *
+		 *     mali: Failed to get pid pointer for <proc>/<pid>
+		 *     mali: Common context initialization failed error = -3
+		 *     libEGL: eglInitialize() failed (EGL_NOT_INITIALIZED)
+		 *
+		 * task_tgid() returns the struct pid directly, with no number
+		 * translation involved, so it is namespace-agnostic. Host
+		 * behaviour is unchanged: in both cases the result is the
+		 * thread group leader of current.
+		 *
+		 * The same bug exists in the bv_r26p0 and bv_r32p1 driver
+		 * copies in this tree; only bv_r38p1 is built, so only that
+		 * one is patched.
+		 */
+		pid_struct = get_pid(task_tgid(current));
 		if (likely(pid_struct)) {
 			struct task_struct *task = pid_task(pid_struct, PIDTYPE_PID);
 
