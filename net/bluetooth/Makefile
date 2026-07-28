@@ -3,10 +3,15 @@
 #
 
 obj-$(CONFIG_BT)	+= bluetooth.o
-# Samsung bu uc satiri yorumlamisti; CONFIG_BT_{RFCOMM,BNEP,HIDP}=y olsa bile
-# alt-dizine inilmedigi icin derlenmiyorlardi (hci_sock.c'deki yorumlama ile ayni
-# sinif). BNEP olmadan BT tethering, RFCOMM olmadan seri profiller, HIDP olmadan
-# BT klavye/fare calismaz. Geri acildi.
+# Samsung had these three lines commented out. With them commented, kbuild
+# never descends into the subdirectories, so RFCOMM/BNEP/HIDP were not built
+# even though CONFIG_BT_{RFCOMM,BNEP,HIDP}=y - the same class of change as the
+# commented-out body of hci_sock.c. Note that /proc/config.gz still reports the
+# options as enabled, so the only reliable check is runtime state
+# (/proc/net/protocols).
+#
+# Without BNEP there is no Bluetooth tethering, without RFCOMM no serial
+# profiles, without HIDP no Bluetooth keyboard/mouse. Re-enabled.
 obj-$(CONFIG_BT_RFCOMM)	+= rfcomm/
 obj-$(CONFIG_BT_BNEP)	+= bnep/
 obj-$(CONFIG_BT_CMTP)	+= cmtp/
