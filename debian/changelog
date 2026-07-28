@@ -1,6 +1,6 @@
-linux-android-samsung-r7 (0.0.0+git20260727140518.3f314d2.droidian) trixie; urgency=medium
+linux-android-samsung-r7 (0.0.0+git20260727140518.3f314d2.droidian+git20260728044303.7e1f184.droidian) trixie; urgency=medium
 
-  * m.18 temizlik: gecici DP hack'leri kaldirildi (hw_workaround + aux_pn_inv=1)
+  * displayport: set ccic_cable_state in the non-queued notification path
 
- -- Yunus Tan <yunus.tan@outlook.com.tr>  Mon, 27 Jul 2026 17:05:18 +0300
+ -- Yunus Tan <yunus.tan@outlook.com.tr>  Tue, 28 Jul 2026 07:43:03 +0300
 
