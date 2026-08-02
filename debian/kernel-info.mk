@@ -36,10 +36,18 @@ KERNEL_IMAGE_WITH_DTB = 1
 # debian/rules copies this file into $(KERNEL_OUT)/ (prebuilt-dt-prepare)
 KERNEL_IMAGE_DTB = samsung-dt-table.img
 
-# DTBO: six revision overlays exist for r7 (exynos9810-r7_eur_open_00..05.dtbo).
-# The stock DTBO partition is left in place, so nothing is embedded into the
-# kernel image.
-KERNEL_IMAGE_WITH_DTB_OVERLAY = 1
+# DTBO: leave the STOCK dtbo partition in place; do NOT build or ship a dtbo.img.
+# The bootloader selects a device tree from the dtbo partition by matching the
+# unit's board revision. Stock dtbo carries one overlay per revision
+# (exynos9810-r7_eur_open_00..05.dtbo => six entries, rev 0..0xff). Our build's
+# mkdtimg only emitted a single rev-0 entry, so flashing it made S-Boot find no
+# match for a real (non-zero) board rev and stop at:
+#     [UFDT] DT entry: not found rev / Could not do normal boot (DT Load Fail)
+# The stock device tree is compatible with this kernel, so there is nothing to
+# gain by replacing it. WITH_DTB_OVERLAY=0 => no dtbo.img is generated, so
+# genimage never bundles one and flash-bootimage never reflashes the partition
+# on a kernel upgrade. (Verified on device, 2026-08-02; see GUNLUK G1.17.)
+KERNEL_IMAGE_WITH_DTB_OVERLAY = 0
 KERNEL_IMAGE_WITH_DTB_OVERLAY_IN_KERNEL = 0
 
 # mkbootimg offsets - VERIFIED against the stock boot.img
