@@ -1019,6 +1019,15 @@ int decon_mmap(struct fb_info *info, struct vm_area_struct *vma)
 #ifdef CONFIG_ION_EXYNOS
 	int ret;
 	struct decon_win *win = info->par;
+	struct decon_device *decon = win->decon;
+
+	if ((!IS_DECON_HIBER_STATE(decon) && IS_DECON_OFF_STATE(decon)) ||
+			decon->state == DECON_STATE_INIT) {
+		decon_warn("%s: decon%d state(%d), mmap blocked (decon off)\n",
+				__func__, decon->id, decon->state);
+		return -ENODEV;
+	}
+
 	vma->vm_page_prot = pgprot_writecombine(vma->vm_page_prot);
 #if defined(CONFIG_FB_TEST)
 	ret = dma_buf_mmap(win->fb_buf_data.dma_buf, vma, 0);
