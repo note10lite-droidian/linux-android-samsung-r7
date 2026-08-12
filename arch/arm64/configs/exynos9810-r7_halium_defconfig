@@ -246,9 +246,23 @@ CONFIG_RFKILL=y
 # drivers/nfc/Kconfig confirmed self-contained, nothing else depends on it).
 # CONFIG_NFC_PN547 is not set
 # CONFIG_NFC_PN547_ESE_SUPPORT is not set
-# CONFIG_ESE_SECURE is not set
-# CONFIG_ESE_SECURE_SPI_PORT is not set
-# CONFIG_ESE_SECURE_USI_MODE is not set
+# ESE_SECURE is NOT the eSE driver and does NOT bring NFC back. It is a bare
+# `bool` (drivers/nfc/Kconfig, `depends on !SEC_FACTORY` only) whose sole job
+# is to tell spi-s3c64xx.c and usi_v2.c that SPI port 7 (108a0000.spi, USI
+# channel 12) belongs to the SECURE WORLD, so the normal world must not
+# initialise it. Both guard sites compare against these two integers and
+# reference no external symbols, so this costs literally nothing at runtime.
+#
+# Same class of bug as the fingerprint block further down (see the long
+# comment on CONFIG_SENSORS_FINGERPRINT): stripping NFC/eSE turned this off,
+# which left port 7 unguarded. The FP guard on port 1 panicked first, so port
+# 7 was never reached - it would have been the very next abort. The Kconfig
+# default for these ports is 99 ("no secure port"), which is why turning
+# ESE_SECURE off silently retargets the guard at a port that doesn't exist
+# instead of failing loudly. Values below are the stock/known-good ones.
+CONFIG_ESE_SECURE=y
+CONFIG_ESE_SECURE_SPI_PORT=7
+CONFIG_ESE_SECURE_USI_MODE=12
 # CONFIG_SEC_NFC_LOGGER is not set
 # CONFIG_UEVENT_HELPER is not set
 CONFIG_DEVTMPFS=y
@@ -673,12 +687,44 @@ CONFIG_MMC_DW_FORCE_32BIT_SFR_RW=y
 # CONFIG_LEDS_S2MU107_FLASH is not set
 # CONFIG_LEDS_S2MU106_FLASH is not set
 CONFIG_SWITCH=y
-# r7-server: fingerprint (Egis ET7XX) stripped - no local-user-auth use
-# case on a headless server; drivers/fingerprint/Kconfig confirmed
-# self-contained aside from one soc/samsung power-sequencing helper that
-# itself depends on SENSORS_FINGERPRINT (so it's inert once this is off).
-# CONFIG_SENSORS_FINGERPRINT is not set
-# CONFIG_SENSORS_ET7XX is not set
+# r7-server: fingerprint (Egis ET7XX) is KEPT ON ON PURPOSE, and this is NOT
+# because we want fingerprint auth (we don't - nothing in userspace uses it).
+# It stays because SENSORS_FINGERPRINT is what arms a HARDWARE SAFETY GUARD
+# that has nothing to do with the sensor driver itself.
+#
+# The top-level Makefile turns CONFIG_SENSORS_FINGERPRINT=y into
+# -DENABLE_SENSORS_FPRINT_SECURE, and that define is injected (via
+# ccflags-y := $(KBUILD_FP_SENSOR_CFLAGS)) into FOUR subsystems:
+#   drivers/spi/          (spi-s3c64xx.c)
+#   drivers/soc/samsung/  (usi_v2.c)
+#   drivers/clk/samsung/  (clk-exynos9810.c)
+#   drivers/pinctrl/samsung/
+# In each one it means "SPI port CONFIG_SENSORS_FP_SPI_NUMBER (=1, the
+# 10450000.spi / USI00 block) is owned by the SECURE WORLD (TEEGRIS) - do not
+# touch its registers, clocks or pins from the normal world."
+#
+# Turning this off silently disarmed all four guards. s3c64xx_spi_hwinit()
+# then writel()'d straight into that TrustZone-owned register block during
+# probe, which faults:
+#   Unhandled fault: synchronous external abort (0x96000410) at 0x10450008
+#   PC is at s3c64xx_spi_hwinit+0x9c  LR is at s3c64xx_spi_probe+0x718
+#   Kernel panic - not syncing: Fatal exception   (PID 1, t=0.435s)
+# A panic in PID 1 = dead at the Samsung logo, no console, no journal. This
+# shipped in TWO builds (2026-08-12 11:16 and 14:57) before /proc/last_kmsg
+# read back from TWRP showed the abort; the known-good kernel differed by
+# exactly this symbol.
+#
+# Do NOT "fix" this by force-defining ENABLE_SENSORS_FPRINT_SECURE while
+# leaving the driver stripped: pinctrl-samsung.c calls fps_resume_set(),
+# which drivers/fingerprint/ defines, so that route link-errors - and
+# stubbing it is the exact mistake that produced an earlier boot panic.
+# clk-exynos9810.c also renames the USI00 gate/vclk to fp-spi-pclk/-sclk
+# under the same define, so the clock handoff is part of the same contract.
+# Keeping the driver built is a few tens of KB and is inert at runtime.
+CONFIG_SENSORS_FINGERPRINT=y
+CONFIG_SENSORS_ET7XX=y
+# CONFIG_SENSORS_ET5XX is not set
+CONFIG_SENSORS_FP_USI_NUMBER=0
 CONFIG_RTC_CLASS=y
 CONFIG_RTC_DRV_S2MPS18=y
 CONFIG_DMADEVICES=y
