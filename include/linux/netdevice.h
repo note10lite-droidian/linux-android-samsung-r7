@@ -2867,9 +2867,17 @@ struct softnet_data {
 	struct sk_buff_head	input_pkt_queue;
 	struct napi_struct	backlog;
 
-#ifdef CONFIG_MODEM_IF_NET_GRO
+	/* r7-server: was gated behind CONFIG_MODEM_IF_NET_GRO, but
+	 * net/core/dev.c's own uses of sd->current_napi (napi_hash_add/
+	 * ____napi_schedule-style bookkeeping) are NOT guarded by that same
+	 * #ifdef - a pre-existing vendor-patch bug that only surfaces once
+	 * MODEM_IF_NET_GRO is off (it depends on LINK_DEVICE_SHMEM, so it
+	 * can't be forced back on without re-enabling the whole modem
+	 * interface). Declaring it unconditionally costs one pointer per
+	 * struct softnet_data and fixes the mismatch without touching any
+	 * NAPI scheduling logic.
+	 */
 	struct napi_struct	*current_napi;
-#endif
 };
 
 static inline void input_queue_head_incr(struct softnet_data *sd)

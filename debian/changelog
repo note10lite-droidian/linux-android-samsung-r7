@@ -1,6 +1,44 @@
-linux-android-samsung-r7 (0.0.0+git20260727140518.3f314d2.droidian+git20260728044303.7e1f184.droidian+git20260808095313.4d5ed1b.droidian) trixie; urgency=medium
+linux-android-samsung-r7 (1.0.0) trixie; urgency=medium
 
-  * decon_dsi: guard decon_mmap against calls while decon is OFF/INIT
+  * Version reset to 1.0.0 for this fork specifically (r7-server branch,
+    used only by the portable-cloud server build, never the phone image's
+    own `droidian` branch). Same root cause and fix as
+    adaptation-samsung-r7-server's own 1.0.0 reset: releng-build-changelog
+    always appends its own ~36-char "+git<timestamp>.<hash>.<comment>"
+    traceability suffix on top of whatever's in debian/changelog's top
+    entry (no droidian/* git tags exist in this repo, so it falls back to
+    the committed top version), and this repo's accumulated
+    "+git...droidian" chain (4 prior builds) plus that suffix exceeded the
+    filesystem's 255-byte filename limit, making dpkg-source's own build
+    fail outright ("File name too long"). Does not touch dpkg's version
+    ordering for this package's own upgrade path - only entries strictly
+    below this one need to compare lower, which they still do.
+  * Strip telephony (CP/modem interface), GNSS, NFC, and fingerprint
+    drivers - r7-server has no cellular/location/local-biometric-auth use
+    case. All four confirmed self-contained in the Kconfig dependency
+    graph (nothing else in the tree selects or depends on them) before
+    disabling: CONFIG_MCU_IPC, CONFIG_SHM_IPC, CONFIG_SEC_SIPC_MODEM_IF,
+    CONFIG_LINK_DEVICE_NAPI, CONFIG_MODEM_IF_QOS, CONFIG_MODEM_IF_NET_GRO,
+    CONFIG_CP_PMUCAL, CONFIG_GPS_BCMxxxxx, CONFIG_GPS_BCM4773,
+    CONFIG_NFC_PN547(_ESE_SUPPORT), CONFIG_ESE_SECURE(_SPI_PORT/_USI_MODE),
+    CONFIG_SEC_NFC_LOGGER, CONFIG_SENSORS_FINGERPRINT, CONFIG_SENSORS_ET7XX.
+    Driver-level removal, not the userspace start-then-stop band-aid
+    (r7-disable-android-services) this fork was using before - that script
+    only ever stopped these services after Android's own init already
+    started them (confirmed live: it missed a late-starting ril-daemon on
+    a fresh boot, which then pinned ~90% of a CPU core for the rest of the
+    session). With no kernel driver behind them, they can't start
+    meaningfully regardless of Android's own init timing.
+  * All prior history stays intact below, unedited (this repo's own
+    "+git...droidian" chain, kept for provenance, not reachable by dpkg's
+    version comparison since only entries strictly below the topmost one
+    need to compare lower).
 
- -- Yunus Tan <yunus.tan@outlook.com.tr>  Sat, 08 Aug 2026 12:53:13 +0300
+ -- Yunus Tan <yunus.tan@outlook.com.tr>  Wed, 12 Aug 2026 14:00:00 +0300
+
+linux-android-samsung-r7 (0.0.0+git20260727140518.3f314d2.droidian+git20260728044303.7e1f184.droidian+git20260808095313.4d5ed1b.droidian+git20260809111826.e718346.droidian) trixie; urgency=medium
+
+  * changelog: record decon_mmap OFF/INIT guard (4d5ed1b6a)
+
+ -- Yunus Tan <yunus.tan@outlook.com.tr>  Sun, 09 Aug 2026 14:18:26 +0300
 

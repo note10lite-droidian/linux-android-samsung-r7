@@ -23,10 +23,24 @@ unsigned shm_get_boot_size(void);
 unsigned shm_get_ipc_rgn_offset(void);
 unsigned shm_get_ipc_rgn_size(void);
 unsigned shm_get_zmb_size(void);
+/* r7-server: shm_ipc.c (this header's implementation) only compiles under
+ * CONFIG_SHM_IPC, but sound/soc/samsung/abox/abox.c calls these 4 VSS
+ * (voice-call audio over the CP) functions unconditionally - a pre-
+ * existing vendor-patch bug, only surfaces with the modem interface off.
+ * No-op stubs here so abox.c still links; VSS is voice-call-specific, not
+ * needed for normal speaker/mic/media audio.
+ */
+#ifdef CONFIG_SHM_IPC
 unsigned shm_get_vss_base(void);
 unsigned shm_get_vss_size(void);
 unsigned shm_get_vparam_base(void);
 unsigned shm_get_vparam_size(void);
+#else
+static inline unsigned shm_get_vss_base(void) { return 0; }
+static inline unsigned shm_get_vss_size(void) { return 0; }
+static inline unsigned shm_get_vparam_base(void) { return 0; }
+static inline unsigned shm_get_vparam_size(void) { return 0; }
+#endif
 unsigned shm_get_acpm_size(void);
 unsigned shm_get_cp_size(void);
 int shm_get_security_param2(unsigned long mode, u32 bl_size, unsigned long *param);

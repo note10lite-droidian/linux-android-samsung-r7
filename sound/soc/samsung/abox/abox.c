@@ -5034,6 +5034,15 @@ static void abox_download_extra_firmware(struct abox_data *data)
 			size = DRAM_FIRMWARE_SIZE;
 			break;
 		case 2:
+			/* r7-server: no CP shared memory => no VSS region;
+			 * phys_to_virt(0) is not valid RAM here. Skip rather
+			 * than hand the caller a poison address.
+			 */
+			if (!shm_get_vss_base()) {
+				dev_info(dev, "%s: no VSS region, skipping %s\n",
+						__func__, ext_fw->name);
+				continue;
+			}
 			base = phys_to_virt(shm_get_vss_base());
 			size = shm_get_vss_size();
 			break;
@@ -6055,16 +6064,25 @@ static int samsung_abox_probe(struct platform_device *pdev)
 	iommu_map(data->iommu_domain, IOVA_IVA_FIRMWARE, data->iva_base_phys,
 			IVA_FIRMWARE_SIZE, 0);
 
-	paddr = shm_get_vss_base();
-	dev_info(dev, "%s(%#x) alloc\n", "vss firmware", shm_get_vss_size());
-	iommu_map(data->iommu_domain, IOVA_VSS_FIRMWARE, paddr,
-			shm_get_vss_size(), 0);
+	/* r7-server: skip the VSS (voice-call-over-modem) IOMMU mappings
+	 * entirely when the CP shared-memory region doesn't exist - see the
+	 * comment in abox_vss.c's probe. shm_get_vss_base() returns 0 with
+	 * CONFIG_SHM_IPC off, and mapping IOVA_VSS_FIRMWARE at physical 0 is
+	 * meaningless (there is no VSS firmware to reach through it).
+	 */
+	if (shm_get_vss_base()) {
+		paddr = shm_get_vss_base();
+		dev_info(dev, "%s(%#x) alloc\n", "vss firmware",
+				shm_get_vss_size());
+		iommu_map(data->iommu_domain, IOVA_VSS_FIRMWARE, paddr,
+				shm_get_vss_size(), 0);
 
-	paddr = shm_get_vparam_base();
-	dev_info(dev, "%s(%#x) alloc\n", "vss parameter",
-			shm_get_vparam_size());
-	iommu_map(data->iommu_domain, IOVA_VSS_PARAMETER, paddr,
-			shm_get_vparam_size(), 0);
+		paddr = shm_get_vparam_base();
+		dev_info(dev, "%s(%#x) alloc\n", "vss parameter",
+				shm_get_vparam_size());
+		iommu_map(data->iommu_domain, IOVA_VSS_PARAMETER, paddr,
+				shm_get_vparam_size(), 0);
+	}
 
 	iommu_map(data->iommu_domain, 0x10000000, 0x10000000, PAGE_SIZE, 0);
 	iovmm_set_fault_handler(&pdev->dev, abox_iommu_fault_handler, data);

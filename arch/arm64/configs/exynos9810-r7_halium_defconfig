@@ -242,12 +242,14 @@ CONFIG_NL80211_TESTMODE=y
 CONFIG_MAC80211=y
 # CONFIG_MAC80211_RC_MINSTREL is not set
 CONFIG_RFKILL=y
-CONFIG_NFC_PN547=y
-CONFIG_NFC_PN547_ESE_SUPPORT=y
-CONFIG_ESE_SECURE=y
-CONFIG_ESE_SECURE_SPI_PORT=7
-CONFIG_ESE_SECURE_USI_MODE=12
-CONFIG_SEC_NFC_LOGGER=y
+# r7-server: NFC stripped (portable-cloud fork has no NFC use case;
+# drivers/nfc/Kconfig confirmed self-contained, nothing else depends on it).
+# CONFIG_NFC_PN547 is not set
+# CONFIG_NFC_PN547_ESE_SUPPORT is not set
+# CONFIG_ESE_SECURE is not set
+# CONFIG_ESE_SECURE_SPI_PORT is not set
+# CONFIG_ESE_SECURE_USI_MODE is not set
+# CONFIG_SEC_NFC_LOGGER is not set
 # CONFIG_UEVENT_HELPER is not set
 CONFIG_DEVTMPFS=y
 CONFIG_DEVTMPFS_MOUNT=y
@@ -261,13 +263,24 @@ CONFIG_BLK_DEV_RAM=y
 CONFIG_BLK_DEV_RAM_SIZE=8192
 CONFIG_UID_SYS_STATS=y
 CONFIG_MEMORY_STATE_TIME=y
-CONFIG_MCU_IPC=y
-CONFIG_SHM_IPC=y
-CONFIG_SEC_SIPC_MODEM_IF=y
-CONFIG_LINK_DEVICE_NAPI=y
+# r7-server: cellular modem (CP) interface stripped - portable-cloud fork
+# is WiFi/USB-only, no SIM/RIL use case. drivers/misc/mcu_ipc + modem_v1
+# Kconfig confirmed self-contained (nothing else in the tree selects or
+# depends on MCU_IPC/SHM_IPC/SEC_SIPC_MODEM_IF).
+# CONFIG_MCU_IPC is not set
+# CONFIG_SHM_IPC is not set
+# CONFIG_SEC_SIPC_MODEM_IF is not set
+# CONFIG_LINK_DEVICE_NAPI is not set
 CONFIG_HW_REV_DETECT=y
-CONFIG_MODEM_IF_QOS=y
-CONFIG_MODEM_IF_NET_GRO=y
+# CONFIG_MODEM_IF_QOS is not set
+# CONFIG_MODEM_IF_NET_GRO is not set
+# ^ depends on LINK_DEVICE_SHMEM (part of the modem stack, off above), so
+# Kconfig forces this to n regardless - can't be set =y here even though
+# net/core/dev.c references softnet_data.current_napi unconditionally.
+# Fixed at the source instead: current_napi's declaration in
+# include/linux/netdevice.h was gated on this symbol (a pre-existing
+# vendor-patch bug, only surfaces with the modem interface off) and is
+# now unconditional.
 CONFIG_USE_MUIC=y
 CONFIG_USE_SAFEOUT=y
 CONFIG_MUIC_NOTIFIER=y
@@ -355,6 +368,9 @@ CONFIG_TABLET_USB_HANWANG=y
 CONFIG_TABLET_USB_KBTAB=y
 CONFIG_INPUT_TOUCHSCREEN=y
 CONFIG_TOUCHSCREEN_MELFAS_MSS100=y
+# r7-server: S-Pen KEPT (user decision 2026-08-12) - actively used for
+# handwriting on this device. The adaptation package's own S-Pen support
+# (61-sec-epen.hwdb resolution quirk, r7-spen-mode) depends on this.
 CONFIG_INPUT_WACOM=y
 CONFIG_EPEN_WACOM_W9018=y
 CONFIG_INPUT_MISC=y
@@ -376,6 +392,19 @@ CONFIG_HW_RANDOM=y
 CONFIG_EXYRNG_FIPS_COMPLIANCE=y
 CONFIG_EXYRNG_FAIL_POLICY_RESET=y
 CONFIG_EXYRNG_USE_CRYPTOMANAGER=y
+# r7-server: I2C is declared EXPLICITLY here on purpose. It used to be pulled
+# in only implicitly (select'ed by camera/FM-radio drivers), so stripping those
+# silently took the entire I2C bus down with them - and with it the
+# touchscreen (Melfas MSS100), every PMIC/MFD (S2MU106/107, S2MPS18, S2MPB02),
+# all regulators, the charger and fuel gauge, MUIC/CCIC USB-C detection, and
+# the RTC. Caught by diffing the RESOLVED .config against the previous working
+# kernel's packaged config before building. Never rely on an implicit select
+# for something this load-bearing.
+CONFIG_I2C=y
+CONFIG_I2C_MUX=y
+CONFIG_I2C_EXYNOS5=y
+CONFIG_I2C_SAMSUNG_HWACG=y
+CONFIG_EXYNOS_SPEEDY=y
 CONFIG_I2C_CHARDEV=y
 CONFIG_SPI=y
 CONFIG_SENSORS_FP_SPI_NUMBER=1
@@ -388,7 +417,7 @@ CONFIG_THERMAL_WRITABLE_TRIPS=y
 CONFIG_THERMAL_GOV_POWER_ALLOCATOR=y
 CONFIG_CPU_THERMAL=y
 CONFIG_GPU_THERMAL=y
-CONFIG_ISP_THERMAL=y
+# CONFIG_ISP_THERMAL is not set
 CONFIG_THERMAL_EMULATION=y
 CONFIG_EXYNOS_THERMAL=y
 CONFIG_EXYNOS_ACPM_THERMAL=y
@@ -406,35 +435,73 @@ CONFIG_REGULATOR_S2MPB02=y
 CONFIG_REGULATOR_S2MPB03=y
 CONFIG_REGULATOR_S2DOS05=y
 CONFIG_MEDIA_SUPPORT=y
+# r7-server: CAMERA stripped entirely. No camera use case on a headless
+# personal-cloud server, and this is what forced the userspace
+# r7-disable-android-services workaround to keep watching for
+# camera_service/sec-camera-provider-4-0 forever. With the drivers gone,
+# Android's init can still try to launch those services but they have
+# nothing to bind to.
+# NOTE: this is an umbrella/gating symbol, NOT a camera driver. It must stay
+# ON because V4L_PLATFORM_DRIVERS depends on it, and that gates VIDEO_EXYNOS ->
+# VIDEO_EXYNOS_SCALER (display path) and VIDEO_EXYNOS_MFC. The actual camera
+# drivers (FIMC-IS2, CIS sensors, actuator, OIS, EEPROM, flash) are all still
+# off below, so no camera hardware is driven regardless.
 CONFIG_MEDIA_CAMERA_SUPPORT=y
-CONFIG_MEDIA_RADIO_SUPPORT=y
+# r7-server: FM radio receiver - no use case.
+# CONFIG_MEDIA_RADIO_SUPPORT is not set
 CONFIG_V4L_PLATFORM_DRIVERS=y
 CONFIG_VIDEO_EXYNOS_SCALER=y
-CONFIG_VIDEO_EXYNOS_MFC=y
-CONFIG_VIDEO_EXYNOS_SMFC=y
-CONFIG_VIDEO_EXYNOS_FIMC_IS2=y
-CONFIG_USE_CSI_DMAOUT_FEATURE=y
-CONFIG_CAMERA_CIS_3M3_OBJ=y
-CONFIG_CAMERA_CIS_3L6_OBJ=y
-CONFIG_CAMERA_CIS_2L2_OBJ=y
-CONFIG_CAMERA_CIS_IMX333_OBJ=y
-CONFIG_CAMERA_CIS_IMX616_OBJ=y
-CONFIG_CAMERA_ACT_AK737X_OBJ=y
-CONFIG_CAMERA_FLASH_S2MU106_OBJ=y
-CONFIG_CAMERA_FLASH_S2MU107_OBJ=y
-CONFIG_USE_SENSOR_GROUP=y
-CONFIG_VENDER_MCD=y
-CONFIG_SECURE_CAMERA_USE=y
-CONFIG_CAMERA_EEPROM_SUPPORT_FRONT=y
-CONFIG_CAMERA_FROM=y
-CONFIG_SENSOR_RETENTION_USE=y
-CONFIG_OIS_USE=y
-CONFIG_CAMERA_RNS_V07=y
-CONFIG_OIS_USE_RUMBA_S6=y
-CONFIG_VIDEO_EXYNOS_REPEATER=y
-CONFIG_VIDEO_EXYNOS_TSMUX=y
-CONFIG_RADIO_RTC6213N=y
-CONFIG_I2C_RTC6213N=y
+# r7-server: hardware video codecs (MFC/SMFC) + the screen-mirroring
+# repeater/TS-mux paths. A personal-cloud server serves media over the
+# network; it never decodes locally. This is what the media.swcodec /
+# mediaextractor / mediametrics / minimedia / vendor.media.omx entries in
+# r7-disable-android-services were chasing.
+# r7-server: hardware video codec KEPT so the Jellyfin hardware-transcode
+# question in PLAN.md Phase 1 can actually be tested rather than foreclosed.
+# Expectation is that it will NOT be usable: this is Samsung's vendor MFC
+# fork (NAL-Q + ION coupled), not mainline s5p-mfc, and under Halium the
+# Android container owns the media hardware - Droidian reaches codecs via
+# droidmedia/libgstdroid, a path already known broken on this device (see
+# r7-camera-black-libgstdroid). If the Phase 1 test confirms it is unusable,
+# strip this in the next kernel pass. Costs nothing at runtime while unused.
+# The repeater/TS-mux paths above stay stripped either way - those are
+# screen-mirroring features, irrelevant to serving media over the network.
+# r7-server: hardware video codec REMOVED (user decision 2026-08-12, after
+# weighing it). Jellyfin does not need it: Direct Play (the client decodes)
+# is the normal mode for a personal server, with software transcode as a
+# slow fallback. Hardware transcode was never realistically reachable here
+# anyway - this is Samsung's vendor MFC fork (NAL-Q + ION coupled), not
+# mainline s5p-mfc, and under Halium the Android container owns the media
+# hardware; Droidian reaches codecs through droidmedia/libgstdroid, a path
+# already known broken on this device (r7-camera-black-libgstdroid). Keeping
+# a driver "in case a test we expect to fail might pass" is not a good enough
+# reason to ship it; re-enabling is one line plus a rebuild if that ever
+# changes.
+# CONFIG_VIDEO_EXYNOS_MFC is not set
+# CONFIG_VIDEO_EXYNOS_SMFC is not set
+# CONFIG_VIDEO_EXYNOS_FIMC_IS2 is not set
+# CONFIG_USE_CSI_DMAOUT_FEATURE is not set
+# CONFIG_CAMERA_CIS_3M3_OBJ is not set
+# CONFIG_CAMERA_CIS_3L6_OBJ is not set
+# CONFIG_CAMERA_CIS_2L2_OBJ is not set
+# CONFIG_CAMERA_CIS_IMX333_OBJ is not set
+# CONFIG_CAMERA_CIS_IMX616_OBJ is not set
+# CONFIG_CAMERA_ACT_AK737X_OBJ is not set
+# CONFIG_CAMERA_FLASH_S2MU106_OBJ is not set
+# CONFIG_CAMERA_FLASH_S2MU107_OBJ is not set
+# CONFIG_USE_SENSOR_GROUP is not set
+# CONFIG_VENDER_MCD is not set
+# CONFIG_SECURE_CAMERA_USE is not set
+# CONFIG_CAMERA_EEPROM_SUPPORT_FRONT is not set
+# CONFIG_CAMERA_FROM is not set
+# CONFIG_SENSOR_RETENTION_USE is not set
+# CONFIG_OIS_USE is not set
+# CONFIG_CAMERA_RNS_V07 is not set
+# CONFIG_OIS_USE_RUMBA_S6 is not set
+# CONFIG_VIDEO_EXYNOS_REPEATER is not set
+# CONFIG_VIDEO_EXYNOS_TSMUX is not set
+# CONFIG_RADIO_RTC6213N is not set
+# CONFIG_I2C_RTC6213N is not set
 CONFIG_EXYNOS_SOC_NAME="9810"
 CONFIG_MALI_BIFROST_R38P1=y
 CONFIG_EXYNOS_HDR_TUNABLE_TONEMAPPING=y
@@ -455,28 +522,41 @@ CONFIG_DISPLAY_USE_INFO=y
 CONFIG_EXYNOS_DECON_MDNIE=y
 CONFIG_EXYNOS_DECON_LCD_S6E3FA9_ANOTE=y
 CONFIG_SUPPORT_MASK_LAYER=y
-CONFIG_SEC_DISPLAYPORT_LOGGER=y
-CONFIG_SEC_DISPLAYPORT_BIGDATA=y
+# CONFIG_SEC_DISPLAYPORT_LOGGER is not set
+# CONFIG_SEC_DISPLAYPORT_BIGDATA is not set
 CONFIG_BACKLIGHT_LCD_SUPPORT=y
 CONFIG_LCD_CLASS_DEVICE=y
 CONFIG_BACKLIGHT_CLASS_DEVICE=y
 # CONFIG_BACKLIGHT_GENERIC is not set
-CONFIG_SOUND=y
-CONFIG_SND=y
-CONFIG_SND_DYNAMIC_MINORS=y
-CONFIG_SND_USB_AUDIO=y
-CONFIG_SND_SOC=y
-CONFIG_SND_SOC_SAMSUNG=y
-CONFIG_SND_SOC_SAMSUNG_EXYNOS9810=y
-CONFIG_SND_SOC_SAMSUNG_R7_RT5665_TAS2562=y
-CONFIG_SND_SOC_SAMSUNG_AUDIO=y
-CONFIG_SEC_SND_ADAPTATION=y
-CONFIG_SND_SOC_SAMSUNG_MAILBOX=y
-CONFIG_SND_SOC_SAMSUNG_VTS=y
-CONFIG_SND_SOC_TAS2562=y
-CONFIG_TAS2562_REGMAP=y
-CONFIG_TAS2562_CODEC=y
-CONFIG_TAS25XX_ALGO=y
+# r7-server: AUDIO AND MICROPHONE stripped entirely (user decision
+# 2026-08-12). A headless personal-cloud server has no local playback or
+# capture use case - media is served over the network and decoded by the
+# client. This removes the whole ASoC stack: the ABOX audio DSP, the
+# RT5665 codec + TAS2562 speaker amp, USB audio, and CONFIG_SND_SOC_SAMSUNG_VTS
+# (the always-on "voice trigger" listener - a permanently hot microphone
+# path, which is worth removing on its own merits for a device that is
+# carried around).
+#
+# Userspace consequences handled in adaptation-samsung-r7-server:
+# android-audio-hal.service, the PulseAudio config distribution, and the
+# r7-volume-save/-restore user services all become dead weight and are
+# removed there.
+# CONFIG_SOUND is not set
+# CONFIG_SND is not set
+# CONFIG_SND_DYNAMIC_MINORS is not set
+# CONFIG_SND_USB_AUDIO is not set
+# CONFIG_SND_SOC is not set
+# CONFIG_SND_SOC_SAMSUNG is not set
+# CONFIG_SND_SOC_SAMSUNG_EXYNOS9810 is not set
+# CONFIG_SND_SOC_SAMSUNG_R7_RT5665_TAS2562 is not set
+# CONFIG_SND_SOC_SAMSUNG_AUDIO is not set
+# CONFIG_SEC_SND_ADAPTATION is not set
+# CONFIG_SND_SOC_SAMSUNG_MAILBOX is not set
+# CONFIG_SND_SOC_SAMSUNG_VTS is not set
+# CONFIG_SND_SOC_TAS2562 is not set
+# CONFIG_TAS2562_REGMAP is not set
+# CONFIG_TAS2562_CODEC is not set
+# CONFIG_TAS25XX_ALGO is not set
 CONFIG_HIDRAW=y
 CONFIG_UHID=y
 CONFIG_HID_A4TECH=y
@@ -590,11 +670,15 @@ CONFIG_MMC_DW_64BIT_DESC=y
 CONFIG_MMC_DW_EXYNOS=y
 CONFIG_MMC_DW_DEBUG=y
 CONFIG_MMC_DW_FORCE_32BIT_SFR_RW=y
-CONFIG_LEDS_S2MU107_FLASH=y
-CONFIG_LEDS_S2MU106_FLASH=y
+# CONFIG_LEDS_S2MU107_FLASH is not set
+# CONFIG_LEDS_S2MU106_FLASH is not set
 CONFIG_SWITCH=y
-CONFIG_SENSORS_FINGERPRINT=y
-CONFIG_SENSORS_ET7XX=y
+# r7-server: fingerprint (Egis ET7XX) stripped - no local-user-auth use
+# case on a headless server; drivers/fingerprint/Kconfig confirmed
+# self-contained aside from one soc/samsung power-sequencing helper that
+# itself depends on SENSORS_FINGERPRINT (so it's inert once this is off).
+# CONFIG_SENSORS_FINGERPRINT is not set
+# CONFIG_SENSORS_ET7XX is not set
 CONFIG_RTC_CLASS=y
 CONFIG_RTC_DRV_S2MPS18=y
 CONFIG_DMADEVICES=y
@@ -622,7 +706,10 @@ CONFIG_CAL_IF=y
 CONFIG_EXYNOS_REBOOT=y
 CONFIG_EXYNOS_PM_DVS=y
 CONFIG_FLEXPMU=y
-CONFIG_CP_PMUCAL=y
+# r7-server: CP (modem) power-management CAL stripped along with the rest
+# of the modem interface above - drivers/soc/samsung/Kconfig confirmed
+# nothing else depends on it.
+# CONFIG_CP_PMUCAL is not set
 CONFIG_CMUCAL_DEBUG=y
 CONFIG_CMUCAL_QCH_IGNORE_SUPPORT=y
 CONFIG_EXYNOS_ACPM=y
@@ -668,7 +755,20 @@ CONFIG_CHARGER_S2MU106=y
 CONFIG_PM_S2MU106=y
 # CONFIG_PHY_EXYNOS_MIPI_VIDEO is not set
 CONFIG_PHY_EXYNOS9810_MIPI=y
-CONFIG_PHY_EXYNOS_DISPLAYPORT=y
+# r7-server: DisplayPort. Already CONFIRMED hardware-impossible on this
+# device - the USB-C port is USB 2.0-only with no DP Alt Mode lane support, so
+# this can never do anything (see r7-usb2-only-no-dp-altmode).
+# NOTE: CONFIG_EXYNOS_DISPLAYPORT is deliberately LEFT ON. Turning it off was
+# tried and reverted: the DP driver is structurally entangled with the decon
+# display core in this vendor tree - decon_reg.c, bts.c, decon.h and
+# displayport.h all reference DP symbols WITHOUT a
+# #if defined(CONFIG_EXYNOS_DISPLAYPORT) guard (only decon_core.c and
+# decon_displayport.c are guarded). Disabling it therefore means patching the
+# display driver itself, which is the one thing this device cannot afford to
+# break - it is the console. Left compiled but inert instead: the USB-C port
+# has no DP lanes (see r7-usb2-only-no-dp-altmode), so it can never probe or
+# activate. Only its audio hook was cut, in include/sound/samsung/dp_ado.h.
+# CONFIG_PHY_EXYNOS_DISPLAYPORT is not set
 # CONFIG_PHY_EXYNOS_DP_VIDEO is not set
 CONFIG_ANDROID=y
 CONFIG_ANDROID_BINDER_IPC=y
@@ -697,34 +797,45 @@ CONFIG_SEC_NAD=y
 CONFIG_SEC_SUPPORT_SECOND_NAD=y
 CONFIG_SEC_SUPPORT_VST=y
 CONFIG_VBUS_NOTIFIER=y
+# r7-server: vibrator KEPT (user decision 2026-08-12) - haptic feedback is
+# genuinely useful when typing on the on-screen keyboard at the console.
+# Note CONFIG_SSP_MOTOR_CALLBACK stays OFF: that is only the bridge between
+# the motor and the SSP sensor hub (stripped), and sec_vibrator.c guards
+# every use of it behind #if defined(CONFIG_SSP_MOTOR_CALLBACK).
 CONFIG_SEC_VIBRATOR=y
 CONFIG_ISA1000_VIBRATOR=y
-CONFIG_GPS_BCMxxxxx=y
-CONFIG_GPS_BCM4773=y
-CONFIG_SENSORS_SYSFS=y
-CONFIG_SENSORS_SSP=y
-CONFIG_SENSORS_SSP_BBD=y
-CONFIG_SENSORS_SSP_LSM6DSL=y
-CONFIG_SENSORS_SSP_MAGNETIC_COMMON=y
-CONFIG_SENSORS_SSP_LPS22H=y
-CONFIG_SENSORS_SSP_SENSORHUB=y
-CONFIG_SENSORS_SSP_MOBEAM=y
-CONFIG_SENSORS_SSP_TMD4906=y
-CONFIG_SENSORS_SSP_PROX_AUTOCAL_AMS=y
-CONFIG_SENSORS_SSP_LIGHT_REPORT_LUX=y
-CONFIG_SENSORS_SSP_LIGHT_COLORID=y
-CONFIG_SENSORS_SSP_IRDATA_FOR_CAMERA=y
-CONFIG_SENSORS_MULTIPLE_GLASS_TYPE=y
-CONFIG_SENSORS_SSP_INTERRUPT_GYRO_SENSOR=y
-CONFIG_SENSORS_SSP_HIFI_BATCHING=y
-CONFIG_SSP_MOTOR_CALLBACK=y
-CONFIG_SENSORS_SSP_THERMISTOR=y
+# r7-server: GNSS stripped - no location use case for this headless
+# personal-cloud server role; drivers/gps/Kconfig confirmed self-contained.
+# CONFIG_GPS_BCMxxxxx is not set
+# CONFIG_GPS_BCM4773 is not set
+# r7-server: the whole SSP sensor hub (accel/gyro/magnetometer/barometer/
+# proximity/light/grip). Auto-rotate is already deliberately disabled in this
+# fork (r7-auto-rotate ships inert) and nothing else consumes motion or
+# ambient-light data.
+# CONFIG_SENSORS_SYSFS is not set
+# CONFIG_SENSORS_SSP is not set
+# CONFIG_SENSORS_SSP_BBD is not set
+# CONFIG_SENSORS_SSP_LSM6DSL is not set
+# CONFIG_SENSORS_SSP_MAGNETIC_COMMON is not set
+# CONFIG_SENSORS_SSP_LPS22H is not set
+# CONFIG_SENSORS_SSP_SENSORHUB is not set
+# CONFIG_SENSORS_SSP_MOBEAM is not set
+# CONFIG_SENSORS_SSP_TMD4906 is not set
+# CONFIG_SENSORS_SSP_PROX_AUTOCAL_AMS is not set
+# CONFIG_SENSORS_SSP_LIGHT_REPORT_LUX is not set
+# CONFIG_SENSORS_SSP_LIGHT_COLORID is not set
+# CONFIG_SENSORS_SSP_IRDATA_FOR_CAMERA is not set
+# CONFIG_SENSORS_MULTIPLE_GLASS_TYPE is not set
+# CONFIG_SENSORS_SSP_INTERRUPT_GYRO_SENSOR is not set
+# CONFIG_SENSORS_SSP_HIFI_BATCHING is not set
+# CONFIG_SSP_MOTOR_CALLBACK is not set
+# CONFIG_SENSORS_SSP_THERMISTOR is not set
 CONFIG_SSP_SUPPORT_MAGNETIC_OVERFLOW=y
-CONFIG_SENSORS_FW_VENDOR=y
-CONFIG_SENSORS_A96T3X6_CRC_CHECK=y
-CONFIG_SENSORS_A96T365IF=y
-CONFIG_SENSORS_SSP_VCNL36811S=y
-CONFIG_SENSORS_SABC=y
+# CONFIG_SENSORS_FW_VENDOR is not set
+# CONFIG_SENSORS_A96T3X6_CRC_CHECK is not set
+# CONFIG_SENSORS_A96T365IF is not set
+# CONFIG_SENSORS_SSP_VCNL36811S is not set
+# CONFIG_SENSORS_SABC is not set
 CONFIG_SPU_VERIFY=y
 CONFIG_EXT2_FS=y
 CONFIG_EXT2_FS_XATTR=y

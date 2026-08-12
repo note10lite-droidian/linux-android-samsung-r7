@@ -52,7 +52,18 @@ u32 mbox_get_value(enum mcu_ipc_region id, u32 mbx_num);
 void mbox_set_value(enum mcu_ipc_region id, u32 mbx_num, u32 msg);
 void mbox_update_value(enum mcu_ipc_region id, u32 mbx_num,
 					u32 msg, u32 mask, u32 pos);
+/* r7-server: mcu_ipc.c (this header's implementation) only compiles under
+ * CONFIG_MCU_IPC, but drivers/thermal/samsung/exynos_tmu.c calls this
+ * unconditionally to read the CP's thermal zone over the mailbox - a
+ * pre-existing vendor-patch bug, only surfaces with the modem interface
+ * off. No-op stub so exynos_tmu.c still links; the AP's own thermal
+ * zones (what actually matters for throttling) don't go through this.
+ */
+#ifdef CONFIG_MCU_IPC
 u32 mbox_extract_value(enum mcu_ipc_region id, u32 mbx_num, u32 mask, u32 pos);
+#else
+static inline u32 mbox_extract_value(enum mcu_ipc_region id, u32 mbx_num, u32 mask, u32 pos) { return 0; }
+#endif
 void mbox_sw_reset(enum mcu_ipc_region id);
 void mcu_ipc_reg_dump(enum mcu_ipc_region id);
 

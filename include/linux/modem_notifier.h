@@ -22,7 +22,19 @@ enum modem_event {
 	MODEM_EVENT_WATCHDOG	= 9,
 };
 
+/* r7-server: modem_notifier.c (this header's implementation) only
+ * compiles under CONFIG_LINK_DEVICE_SHMEM, but
+ * sound/soc/samsung/abox/abox.c registers a callback unconditionally -
+ * a pre-existing vendor-patch bug, only surfaces with the modem
+ * interface off. No-op stub (returns success, never fires - correct,
+ * since there is no modem to generate events) so abox.c still links.
+ */
+#ifdef CONFIG_LINK_DEVICE_SHMEM
 extern int register_modem_event_notifier(struct notifier_block *nb);
 extern void modem_notify_event(enum modem_event evt);
+#else
+static inline int register_modem_event_notifier(struct notifier_block *nb) { return 0; }
+static inline void modem_notify_event(enum modem_event evt) { }
+#endif
 
 #endif/*__MODEM_NOTIFIER_H__*/

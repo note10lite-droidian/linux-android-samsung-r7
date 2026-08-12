@@ -57,6 +57,24 @@ static int samsung_abox_vss_probe(struct platform_device *pdev)
 
 	of_property_read_u32(np, "magic_offset", &VSS_MAGIC_OFFSET);
 	dev_info(dev, "magic_offset = 0x%08X\n", VSS_MAGIC_OFFSET);
+
+	/* r7-server: VSS is voice-call audio carried over the CP (modem)
+	 * shared-memory region. With the modem interface stripped
+	 * (CONFIG_SHM_IPC off) there is no such region: shm_get_vss_base()
+	 * returns 0, and phys_to_virt(0 + magic_offset) is NOT valid RAM on
+	 * this SoC (DRAM starts well above 0), so the writel() below panics
+	 * the kernel during probe - before the display/console is up, so it
+	 * looks exactly like a hang at the vendor boot logo. Confirmed live
+	 * 2026-08-12. Bail out instead: there is no voice call to notify
+	 * about, and abox_vss_notify_call() (the only symbol other abox
+	 * files actually need from here) does not depend on this probe
+	 * having run.
+	 */
+	if (!shm_get_vss_base()) {
+		dev_info(dev, "no CP shared-memory VSS region, skipping\n");
+		return 0;
+	}
+
 	magic_addr = phys_to_virt(shm_get_vss_base() + VSS_MAGIC_OFFSET);
 	writel(0, magic_addr);
 	return 0;
