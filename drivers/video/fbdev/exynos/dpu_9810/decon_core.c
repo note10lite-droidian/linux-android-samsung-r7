@@ -1005,6 +1005,22 @@ int decon_update_pwr_state(struct decon_device *decon, u32 mode)
 		return 0;
 	}
 
+	/* r7: a POWERDOWN request can arrive while decon is still in its
+	 * post-probe bootloader-continuity INIT state (real activation in
+	 * decon_initial_display() is skipped at probe) - confirmed live via
+	 * kprobe trace to be vendor.hwcomposer-2-2's own early fb_blank
+	 * call, well before phoc/hwcomposer's real compositor is ready.
+	 * decon_pan_display()/decon_set_win_info() already no-op for this
+	 * same DECON_STATE_INIT case (see decon_dsi.c); this dispatcher
+	 * didn't, so it was tearing down the still-visible bootloader frame
+	 * for no correct reason, leaving the panel dark for several seconds
+	 * of boot. Silently ignore it here too, matching that precedent. */
+	if (decon->state == DECON_STATE_INIT && mode == DISP_PWR_OFF) {
+		decon_warn("decon-%d: ignoring premature blank while INIT (bootloader continuity)\n",
+				decon->id);
+		return 0;
+	}
+
 	if (IS_DECON_OFF_STATE(decon)) {
 		if (mode == DISP_PWR_OFF) {
 			ret = decon_enable(decon);
