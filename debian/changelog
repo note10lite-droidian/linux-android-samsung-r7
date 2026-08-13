@@ -1,6 +1,6 @@
-linux-android-samsung-r7 (0.0.0+git20260727140518.3f314d2.droidian+git20260728044303.7e1f184.droidian+git20260808095313.4d5ed1b.droidian) trixie; urgency=medium
+linux-android-samsung-r7 (0.0.0+git20260809111826.e718346.droidian) trixie; urgency=medium
 
-  * decon_dsi: guard decon_mmap against calls while decon is OFF/INIT
+  * changelog: record decon_mmap OFF/INIT guard (4d5ed1b6a)
 
- -- Yunus Tan <yunus.tan@outlook.com.tr>  Sat, 08 Aug 2026 12:53:13 +0300
+ -- Yunus Tan <yunus.tan@outlook.com.tr>  Sun, 09 Aug 2026 14:18:26 +0300
 
