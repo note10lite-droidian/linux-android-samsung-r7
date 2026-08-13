@@ -3199,7 +3199,18 @@ int decon_release(struct fb_info *info, int user)
 
 		decon_hiber_block_exit(decon);
 		/* Unused DECON state is DECON_STATE_INIT */
-		if (IS_DECON_ON_STATE(decon)) {
+		/* r7: IS_DECON_ON_STATE() deliberately counts DECON_STATE_INIT
+		 * as "on" (see decon.h) so this path used to disable the panel
+		 * whenever ANY process closed its fd to /dev/graphics/fb0
+		 * while decon was still sitting in its post-probe bootloader-
+		 * continuity INIT state - confirmed live (2026-08-13) to be
+		 * the actual trigger for the multi-second dark screen at boot,
+		 * separate from and in addition to the fb_blank ioctl path
+		 * guarded in decon_update_pwr_state(). Exclude INIT here too,
+		 * for the same reason: nothing has properly taken ownership of
+		 * decon yet via a real decon_enable(), so there's no correct
+		 * "off" transition to make on an incidental fd close. */
+		if (IS_DECON_ON_STATE(decon) && decon->state != DECON_STATE_INIT) {
 #if defined(CONFIG_EXYNOS_MASS_PANEL)
 			decon_simple_notifier_call_chain(FB_EARLY_EVENT_BLANK, FB_BLANK_POWERDOWN);
 #endif
